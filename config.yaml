@@ -1,15 +1,8 @@
 routes:
-- name: New York to Tokyo
-  origin: NYC
-  destination: TYO
-  departure_date: '2026-09-10'
-  return_date: '2026-09-20'
-  target_price: 650
-  currency: usd
-- name: Kuala Lumpur to Guangzhou
+- name: Kuala Lumpur to Batam
   origin: KUL
-  destination: CAN
+  destination: BTH
   departure_date: '2026-09-24'
   return_date: '2026-09-27'
-  target_price: 750.0
+  target_price: 350.0
   currency: myr
