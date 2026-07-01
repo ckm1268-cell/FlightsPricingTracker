@@ -8,6 +8,10 @@ permissions:
   contents: write
   issues: write
 
+concurrency:
+  group: repo-config-writes
+  cancel-in-progress: false
+
 jobs:
   add-route:
     if: contains(github.event.issue.labels.*.name, 'add-route')
@@ -15,6 +19,9 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+
+      - name: Pull latest changes
+        run: git pull --rebase origin main
 
       - name: Set up Python
         uses: actions/setup-python@v5
