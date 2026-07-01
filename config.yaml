@@ -1,8 +1,8 @@
 routes:
-- name: Kuala Lumpur to Batam
+- name: Kuala Lumpur to Guangzhou
   origin: KUL
-  destination: BTH
+  destination: CAN
   departure_date: '2026-09-24'
   return_date: '2026-09-27'
-  target_price: 350.0
+  target_price: 750.0
   currency: myr
