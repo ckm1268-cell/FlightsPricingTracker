@@ -1,0 +1,22 @@
+# Flight Price Tracker Config
+# This file is normally edited automatically when you submit a GitHub Issue
+# Form ("Add a flight route to track"). You can also edit it by hand.
+#
+# Fields:
+#   name            - any label you want
+#   origin          - 3-letter IATA city/airport code (e.g. NYC)
+#   destination     - 3-letter IATA city/airport code (e.g. TYO)
+#   departure_date  - YYYY-MM-DD (prices are checked across a 7-day window
+#                      centered on this date, since fares shift day to day)
+#   return_date     - YYYY-MM-DD, leave blank ("") for a one-way trip
+#   target_price    - alert fires when price <= this value
+#   currency        - e.g. usd, eur, gbp
+
+routes:
+  - name: "New York to Tokyo"
+    origin: NYC
+    destination: TYO
+    departure_date: "2026-09-10"
+    return_date: "2026-09-20"
+    target_price: 650
+    currency: usd
