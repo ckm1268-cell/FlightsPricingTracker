@@ -2,7 +2,7 @@ name: Add Route From Issue
 
 on:
   issues:
-    types: [opened, labeled]
+    types: [opened, labeled, reopened]
 
 permissions:
   contents: write
