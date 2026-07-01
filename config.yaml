@@ -1,8 +1,8 @@
 routes:
-- name: Kuala Lumpur to Guangzhou
-  origin: KUL
-  destination: CAN
+- name: Kuala Lumpur to Batam
+  origin: NYC
+  destination: TYO
   departure_date: '2026-09-24'
   return_date: '2026-09-27'
-  target_price: 750.0
-  currency: myr
+  target_price: 950.0
+  currency: usd
