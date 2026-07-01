@@ -13,5 +13,10 @@
     "last_checked": "2026-07-01T23:35:34.601523+00:00",
     "last_price": 490,
     "under_target": false
+  },
+  "NYC-TYO-2026-09-24": {
+    "last_checked": "2026-07-01T23:51:01.167917+00:00",
+    "last_price": 1075,
+    "under_target": false
   }
 }
