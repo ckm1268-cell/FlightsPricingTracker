@@ -41,6 +41,7 @@ GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
 NOTIFY_EMAIL = os.environ.get("NOTIFY_EMAIL", GMAIL_USER)
 
 WEEK_MATRIX_URL = "https://api.travelpayouts.com/v2/prices/week-matrix"
+CHEAP_URL = "https://api.travelpayouts.com/v1/prices/cheap"
 
 
 def load_config():
@@ -96,6 +97,41 @@ def get_best_price(origin, destination, departure_date, return_date, currency):
     return best
 
 
+def get_cheapest_month_price(origin, destination, currency):
+    """
+    Fallback for routes with no cached week-matrix data. Queries the
+    prices/cheap endpoint, which has broader coverage (any cheapest fare
+    found for the route recently, regardless of specific dates). Less
+    precise than week-matrix (dates may not match what you asked for) but
+    better than nothing for less-popular routes.
+    """
+    params = {
+        "origin": origin,
+        "destination": destination,
+        "currency": currency,
+        "token": TRAVELPAYOUTS_TOKEN,
+    }
+    resp = requests.get(CHEAP_URL, params=params, timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+
+    if not data.get("success") or not data.get("data"):
+        return None
+
+    best = None
+    for dest_data in data["data"].values():
+        for flight in dest_data.values():
+            price = flight.get("price")
+            if price is not None and (best is None or price < best["value"]):
+                best = {
+                    "value": price,
+                    "depart_date": flight.get("departure_at"),
+                    "return_date": flight.get("return_at"),
+                    "approximate": True,
+                }
+    return best
+
+
 def send_telegram(text):
     if not (TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID):
         print("Telegram credentials missing - skipping send. "
@@ -148,12 +184,15 @@ def main():
                 route.get("return_date") or None,
                 route["currency"],
             )
+            if best is None:
+                print(f"  No exact-date data for {key}, trying broader monthly lookup...")
+                best = get_cheapest_month_price(route["origin"], route["destination"], route["currency"])
         except Exception as e:
             print(f"  Failed to fetch price for {key}: {e}")
             continue
 
         if best is None:
-            print(f"  No fare data found for {key}")
+            print(f"  No fare data found for {key} (exact or approximate)")
             continue
 
         price = best["value"]
@@ -172,6 +211,7 @@ def main():
                 "target": target,
                 "depart_date": best.get("depart_date"),
                 "return_date": best.get("return_date"),
+                "approximate": best.get("approximate", False),
             })
 
         history[key] = {
@@ -185,9 +225,10 @@ def main():
     if alerts:
         lines = [f"✈️ Flight price alert: {len(alerts)} route(s) hit your target!\n"]
         for a in alerts:
+            note = " (approx. dates - verify before booking)" if a.get("approximate") else ""
             lines.append(
                 f"- {a['name']}: {a['price']} {a['currency']} (target {a['target']}) "
-                f"| depart {a.get('depart_date', 'N/A')} / return {a.get('return_date', 'N/A')}"
+                f"| depart {a.get('depart_date', 'N/A')} / return {a.get('return_date', 'N/A')}{note}"
             )
         body = "\n".join(lines)
         send_telegram(body)
