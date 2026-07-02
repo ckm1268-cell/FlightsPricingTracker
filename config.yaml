@@ -1,8 +1,8 @@
 routes:
-- name: New York to Tokyo
-  origin: NYC
-  destination: TYO
-  departure_date: '2026-07-08'
-  return_date: '2026-07-18'
-  target_price: 6650.0
+- name: Kuala Lumpur to Hong Kong
+  origin: KUL
+  destination: HKG
+  departure_date: '2026-07-10'
+  return_date: '2026-07-17'
+  target_price: 3650.0
   currency: myr
