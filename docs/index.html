@@ -77,12 +77,34 @@
     background: var(--tg-theme-secondary-bg-color, #f0f0f0);
     color: var(--tg-theme-hint-color, #666666);
   }
+  .current-routes {
+    margin-bottom: 20px;
+  }
+  .route-card {
+    background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+  .route-card .route-name {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 2px;
+  }
+  .route-card .route-detail {
+    color: var(--tg-theme-hint-color, #888888);
+  }
 </style>
 </head>
 <body>
 
 <h1>✈️ Track a flight route</h1>
-<p class="subtitle">Submitting replaces the route you're currently tracking.</p>
+<p class="subtitle">Submitting adds a new route, or updates one with the same From/To if it already exists.</p>
+
+<div id="currentRoutes" class="current-routes">
+  <p class="hint">Loading current routes…</p>
+</div>
 
 <form id="routeForm">
   <label for="route_name">Route name</label>
@@ -136,8 +158,9 @@
 
 <script>
   // ---- EDIT THIS after deploying your Cloudflare Worker ----
-  const WORKER_URL = "https://flight-tracker-bridge.ckm1268.workers.dev/submit";
+    const WORKER_URL = "https://flight-tracker-bridge.ckm1268.workers.dev/submit";
   // ------------------------------------------------------------
+  const WORKER_ROUTES_URL = WORKER_URL.replace(/\/submit\/?$/, "") + "/routes";
 
   const tg = window.Telegram.WebApp;
   tg.ready();
@@ -145,6 +168,42 @@
 
   const form = document.getElementById("routeForm");
   const statusEl = document.getElementById("status");
+  const currentRoutesEl = document.getElementById("currentRoutes");
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+  }
+
+  async function loadCurrentRoutes() {
+    try {
+      const resp = await fetch(`${WORKER_ROUTES_URL}?initData=${encodeURIComponent(tg.initData)}`);
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error(data.error || "Failed to load routes");
+
+      if (!data.routes || data.routes.length === 0) {
+        currentRoutesEl.innerHTML = '<p class="hint">No routes currently tracked yet.</p>';
+        return;
+      }
+
+      currentRoutesEl.innerHTML =
+        '<p class="hint" style="margin-bottom:8px;">Currently tracking:</p>' +
+        data.routes.map((r) => `
+          <div class="route-card">
+            <div class="route-name">${escapeHtml(r.name || `${r.origin}-${r.destination}`)}</div>
+            <div class="route-detail">${escapeHtml(r.origin)} → ${escapeHtml(r.destination)}
+              | depart ${escapeHtml(r.departure_date || "?")}${r.return_date ? ` / return ${escapeHtml(r.return_date)}` : " (one-way)"}
+              | target ${escapeHtml(r.target_price)} ${escapeHtml((r.currency || "").toUpperCase())}
+            </div>
+          </div>
+        `).join("");
+    } catch (err) {
+      currentRoutesEl.innerHTML = `<p class="hint">Could not load current routes (${escapeHtml(err.message)}).</p>`;
+    }
+  }
+
+  loadCurrentRoutes();
 
   function setStatus(kind, text) {
     statusEl.className = kind;
@@ -172,7 +231,11 @@
     return null;
   }
 
+  let isSubmitting = false;
+
   async function submitRoute() {
+    if (isSubmitting) return;  // ignore rapid double-taps / repeat click events
+
     const values = currentValues();
     const error = validate(values);
     if (error) {
@@ -181,8 +244,10 @@
       return;
     }
 
+    isSubmitting = true;
     setStatus("loading", "Submitting…");
     tg.MainButton.showProgress();
+    tg.MainButton.disable();
 
     try {
       const resp = await fetch(WORKER_URL, {
@@ -202,9 +267,12 @@
       setStatus("success", "✅ Route saved! Check Telegram for confirmation shortly.");
       tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
       setTimeout(() => tg.close(), 1800);
+      // isSubmitting stays true - the app is closing, no need to re-enable
     } catch (err) {
       setStatus("error", "Failed: " + err.message);
       tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("error");
+      isSubmitting = false;
+      tg.MainButton.enable();
     } finally {
       tg.MainButton.hideProgress();
     }
