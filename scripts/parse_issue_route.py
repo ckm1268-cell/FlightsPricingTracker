@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
 Parses a GitHub Issue Form submission (the "Add a flight route to track"
-form) and REPLACES the tracked route in config.yaml with this new one.
-Only one route is tracked at a time - each new submission overwrites the
-previous route entirely.
+form) and adds it to config.yaml. If a route with the same origin and
+destination already exists, it's UPDATED (dates/target/currency replaced)
+rather than duplicated. Otherwise it's added as a new route alongside
+whatever's already being tracked - multiple routes can be tracked at once.
 
 Reads the issue body from the ISSUE_BODY environment variable. GitHub
 renders issue forms as markdown like:
@@ -106,26 +107,38 @@ def main():
 
     with open(CONFIG_PATH) as f:
         config = yaml.safe_load(f) or {"routes": []}
-    previous_routes = config.get("routes") or []
-    config["routes"] = [new_route]  # replace - only one route tracked at a time
+    routes = config.get("routes") or []
+
+    # Match existing route by origin+destination - update in place if found,
+    # otherwise add as a new route so multiple routes can be tracked at once.
+    existing_index = None
+    for i, r in enumerate(routes):
+        if r.get("origin") == origin and r.get("destination") == destination:
+            existing_index = i
+            break
+
+    if existing_index is not None:
+        routes[existing_index] = new_route
+        action = "updated"
+    else:
+        routes.append(new_route)
+        action = "added"
+
+    config["routes"] = routes
 
     with open(CONFIG_PATH, "w") as f:
         yaml.dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
 
-    print(f"Replaced route. Previous: {previous_routes} -> New: {new_route}")
+    print(f"Route {action}: {new_route} (now tracking {len(routes)} route(s) total)")
 
     # Write a summary for the workflow to use in its issue comment
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
-    old_route_desc = (
-        f"{previous_routes[0]['name']} ({previous_routes[0]['origin']}->{previous_routes[0]['destination']})"
-        if previous_routes else "none"
-    )
     confirmation = (
-        f"Now tracking **{new_route['name']}**: {origin} -> {destination}, "
+        f"Route **{action}**: {new_route['name']} ({origin} -> {destination}), "
         f"depart {new_route['departure_date']}"
         + (f", return {new_route['return_date']}" if new_route['return_date'] else " (one-way)")
         + f", target {target_price} {new_route['currency']}"
-        + f"\n\n(Replaced previous route: {old_route_desc})"
+        + f"\n\nNow tracking {len(routes)} route(s) total."
     )
     if summary_path:
         with open(summary_path, "a") as f:
