@@ -18,5 +18,10 @@
     "last_checked": "2026-07-02T00:03:23.140677+00:00",
     "last_price": 1075,
     "under_target": true
+  },
+  "KUL-HKG-2026-07-17": {
+    "last_checked": "2026-07-02T06:41:34.768265+00:00",
+    "last_price": 955,
+    "under_target": true
   }
 }
