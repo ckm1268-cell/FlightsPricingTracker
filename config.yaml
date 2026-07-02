@@ -6,10 +6,10 @@ routes:
   return_date: '2026-09-27'
   target_price: 350.0
   currency: myr
-- name: KL to Guangzhou
+- name: Kuala Lumpur to Guangzhou
   origin: KUL
   destination: CAN
-  departure_date: '2026-07-04'
-  return_date: '2026-07-11'
-  target_price: 1888.0
+  departure_date: '2026-07-20'
+  return_date: '2026-07-26'
+  target_price: 1898.0
   currency: myr
