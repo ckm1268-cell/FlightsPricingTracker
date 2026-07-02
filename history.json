@@ -48,5 +48,10 @@
     "last_checked": "2026-07-02T10:48:26.273679+00:00",
     "last_price": 457,
     "under_target": true
+  },
+  "KUL-NYC-2026-07-04": {
+    "last_checked": "2026-07-02T10:51:15.907524+00:00",
+    "last_price": 932,
+    "under_target": true
   }
 }
