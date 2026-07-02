@@ -10,6 +10,11 @@ alert (primary) plus a WhatsApp alert via CallMeBot (secondary, best-effort
 never block the Telegram alert) - and optionally an email - when a target
 is met.
 
+Also keeps a rolling 30-day price log per route (to flag "lowest price
+seen in 30 days" in alerts) and sends a one-time self-monitoring alert if
+a route's price check fails 3 times in a row, so a broken token/API
+doesn't fail silently for weeks.
+
 Required environment variables (set as GitHub Actions secrets):
   TRAVELPAYOUTS_TOKEN  - free token from https://www.travelpayouts.com
 
@@ -53,6 +58,9 @@ CHEAP_URL = "https://api.travelpayouts.com/v1/prices/cheap"
 AIRLINES_URL = "https://api.travelpayouts.com/data/en/airlines.json"
 
 _airline_name_cache = None  # populated once per run, on first lookup
+
+CONSECUTIVE_FAILURE_THRESHOLD = 3  # send a self-monitoring alert after this many failed checks in a row
+PRICE_LOG_WINDOW_DAYS = 30
 
 
 def load_config():
@@ -212,6 +220,28 @@ def get_airline_for_date(origin, destination, currency, target_depart_date):
     return None
 
 
+def update_price_log(entry, price, now_iso):
+    """
+    Appends today's price to the route's rolling log and prunes entries
+    older than PRICE_LOG_WINDOW_DAYS. Returns (updated_log, lowest_price_in_window).
+    """
+    log = entry.get("price_log", [])
+    log.append({"date": now_iso, "price": price})
+
+    cutoff = datetime.now(timezone.utc).timestamp() - (PRICE_LOG_WINDOW_DAYS * 86400)
+    pruned = []
+    for item in log:
+        try:
+            item_ts = datetime.fromisoformat(item["date"]).timestamp()
+        except Exception:
+            continue
+        if item_ts >= cutoff:
+            pruned.append(item)
+
+    lowest = min((item["price"] for item in pruned), default=price)
+    return pruned, lowest
+
+
 def send_telegram(text):
     if not (TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID):
         print("Telegram credentials missing - skipping send. "
@@ -269,10 +299,12 @@ def main():
     history = load_history()
     now = datetime.now(timezone.utc).isoformat()
     alerts = []
+    failure_alerts = []
 
     for route in routes:
         key = f"{route['origin']}-{route['destination']}-{route['departure_date']}"
         print(f"Checking {route['name']} ({key})...")
+        entry = history.get(key, {})
 
         try:
             best = get_best_price(
@@ -292,19 +324,40 @@ def main():
                 )
         except Exception as e:
             print(f"  Failed to fetch price for {key}: {e}")
+            entry["consecutive_failures"] = entry.get("consecutive_failures", 0) + 1
+            print(f"  Consecutive failures for this route: {entry['consecutive_failures']}")
+            if (entry["consecutive_failures"] >= CONSECUTIVE_FAILURE_THRESHOLD
+                    and not entry.get("failure_alert_sent")):
+                failure_alerts.append(f"{route['name']} ({key}): {entry['consecutive_failures']} checks in a row - last error: {e}")
+                entry["failure_alert_sent"] = True
+            history[key] = entry
             continue
 
         if best is None:
             print(f"  No fare data found for {key} (exact or approximate)")
+            entry["consecutive_failures"] = entry.get("consecutive_failures", 0) + 1
+            if (entry["consecutive_failures"] >= CONSECUTIVE_FAILURE_THRESHOLD
+                    and not entry.get("failure_alert_sent")):
+                failure_alerts.append(f"{route['name']} ({key}): no fare data found for {entry['consecutive_failures']} checks in a row")
+                entry["failure_alert_sent"] = True
+            history[key] = entry
             continue
+
+        # success - reset failure tracking
+        entry["consecutive_failures"] = 0
+        entry["failure_alert_sent"] = False
 
         price = best["value"]
         target = route["target_price"]
-        was_under_target = history.get(key, {}).get("under_target", False)
+        was_under_target = entry.get("under_target", False)
         airline_code = best.get("airline")
         airline_name = get_airline_name(airline_code) if airline_code else None
         airline_display = f" via {airline_name}" if airline_name else ""
-        print(f"  Cheapest found: {price} {route['currency']}{airline_display} (target: {target})")
+
+        price_log, lowest_in_window = update_price_log(entry, price, now)
+        is_lowest_in_window = price <= lowest_in_window
+        trend_display = " (lowest in 30 days)" if is_lowest_in_window else ""
+        print(f"  Cheapest found: {price} {route['currency']}{airline_display} (target: {target}){trend_display}")
 
         is_under_target = price <= target
 
@@ -319,13 +372,16 @@ def main():
                 "return_date": best.get("return_date"),
                 "approximate": best.get("approximate", False),
                 "airline": airline_name,
+                "is_lowest_in_window": is_lowest_in_window,
             })
 
-        history[key] = {
+        entry.update({
             "last_checked": now,
             "last_price": price,
             "under_target": is_under_target,
-        }
+            "price_log": price_log,
+        })
+        history[key] = entry
 
     save_history(history)
 
@@ -334,10 +390,11 @@ def main():
         for a in alerts:
             note = " (approx. dates - verify before booking)" if a.get("approximate") else ""
             airline_note = f" | Airline: {a['airline']}" if a.get("airline") else ""
+            trend_note = " | Lowest in 30 days" if a.get("is_lowest_in_window") else ""
             lines.append(
                 f"- {a['name']}: {a['price']} {a['currency']} (target {a['target']}) "
                 f"| depart {a.get('depart_date', 'N/A')} / return {a.get('return_date', 'N/A')}"
-                f"{airline_note}{note}"
+                f"{airline_note}{trend_note}{note}"
             )
         body = "\n".join(lines)
         send_telegram(body)       # primary channel
@@ -345,6 +402,13 @@ def main():
         send_email(f"Flight price alert: {len(alerts)} route(s) hit your target", body)
     else:
         print("No new alerts this run.")
+
+    if failure_alerts:
+        warning = "\u26a0\ufe0f Flight tracker self-check: repeated failures\n\n" + "\n".join(
+            f"- {msg}" for msg in failure_alerts
+        ) + "\n\nCheck the GitHub Actions log for details - your TRAVELPAYOUTS_TOKEN or route data may need attention."
+        send_telegram(warning)
+        send_email("Flight tracker: repeated check failures", warning)
 
 
 if __name__ == "__main__":
