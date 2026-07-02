@@ -1,6 +1,6 @@
 # Flight Price Tracker
 
-Free, always-on flight price tracker. Checks fares every 6 hours via GitHub
+Free, always-on flight price tracker. Checks fares every 3 hours via GitHub
 Actions, sends a **Telegram alert** when a route hits your target price,
 and lets you add new routes by filling out a form in the GitHub app -
 no need to hand-edit any files.
@@ -73,7 +73,7 @@ edit `config.yaml` directly in the repo (each route is a plain YAML block).
 
 ## Adjusting the check frequency
 Edit the cron schedule in `.github/workflows/check_prices.yml`. Default is
-every 6 hours. Cron syntax: `min hour day month weekday`.
+every 3 hours. Cron syntax: `min hour day month weekday`.
 
 ## Costs
 Everything here is free:
