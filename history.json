@@ -43,5 +43,10 @@
     "last_checked": "2026-07-02T08:21:47.407339+00:00",
     "last_price": 932,
     "under_target": true
+  },
+  "KUL-BTH-2026-07-10": {
+    "last_checked": "2026-07-02T08:34:01.578211+00:00",
+    "last_price": 458,
+    "under_target": true
   }
 }
