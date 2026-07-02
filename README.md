@@ -10,7 +10,7 @@ no need to hand-edit any files.
   track" form (works great from the GitHub mobile app). A workflow parses
   it and appends it to `config.yaml` automatically, then closes the issue
   with a confirmation.
-- **Checks run automatically:** every 6 hours, `track_prices.py` fetches
+- **Checks run automatically:** every 3 hours, `track_prices.py` fetches
   the cheapest fare for each route's dates (Travelpayouts week-matrix API
   - checks a 7-day window around your dates, since fares move day to day)
   and compares it to your target.
