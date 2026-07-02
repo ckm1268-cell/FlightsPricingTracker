@@ -160,7 +160,7 @@ def get_airline_name(iata_code):
             resp = requests.get(AIRLINES_URL, params={"token": TRAVELPAYOUTS_TOKEN}, timeout=15)
             resp.raise_for_status()
             airlines = resp.json()
-            _airline_name_cache = {a.get("iata"): a.get("name") for a in airlines if a.get("iata")}
+            _airline_name_cache = {a.get("code"): a.get("name") for a in airlines if a.get("code")}
             print(f"  Loaded {len(_airline_name_cache)} airline names")
         except Exception as e:
             print(f"  Could not load airline name list (non-fatal): {e}")
