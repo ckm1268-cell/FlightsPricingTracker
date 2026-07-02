@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Flight Route Tracker</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    color-scheme: light dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--tg-theme-bg-color, #ffffff);
+    color: var(--tg-theme-text-color, #111111);
+  }
+  h1 {
+    font-size: 20px;
+    margin: 4px 0 4px;
+  }
+  p.subtitle {
+    margin: 0 0 20px;
+    font-size: 14px;
+    color: var(--tg-theme-hint-color, #888888);
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin: 16px 0 6px;
+    color: var(--tg-theme-hint-color, #666666);
+  }
+  input, select {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border-radius: 10px;
+    border: 1px solid var(--tg-theme-hint-color, #cccccc);
+    background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+    color: var(--tg-theme-text-color, #111111);
+  }
+  input:focus, select:focus {
+    outline: 2px solid var(--tg-theme-button-color, #2481cc);
+  }
+  .hint {
+    font-size: 12px;
+    color: var(--tg-theme-hint-color, #999999);
+    margin-top: 4px;
+  }
+  .row2 {
+    display: flex;
+    gap: 12px;
+  }
+  .row2 > div { flex: 1; }
+  #status {
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    display: none;
+  }
+  #status.error {
+    display: block;
+    background: #ffe5e5;
+    color: #b30000;
+  }
+  #status.success {
+    display: block;
+    background: #e3f7e3;
+    color: #1a7a1a;
+  }
+  #status.loading {
+    display: block;
+    background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+    color: var(--tg-theme-hint-color, #666666);
+  }
+</style>
+</head>
+<body>
+
+<h1>✈️ Track a flight route</h1>
+<p class="subtitle">Submitting replaces the route you're currently tracking.</p>
+
+<form id="routeForm">
+  <label for="route_name">Route name</label>
+  <input type="text" id="route_name" placeholder="New York to Tokyo" required>
+
+  <div class="row2">
+    <div>
+      <label for="origin">From (IATA)</label>
+      <input type="text" id="origin" placeholder="NYC" maxlength="3" style="text-transform:uppercase" required>
+    </div>
+    <div>
+      <label for="destination">To (IATA)</label>
+      <input type="text" id="destination" placeholder="TYO" maxlength="3" style="text-transform:uppercase" required>
+    </div>
+  </div>
+  <p class="hint">3-letter airport or city codes</p>
+
+  <div class="row2">
+    <div>
+      <label for="departure_date">Departure date</label>
+      <input type="date" id="departure_date" required>
+    </div>
+    <div>
+      <label for="return_date">Return date</label>
+      <input type="date" id="return_date">
+    </div>
+  </div>
+  <p class="hint">Leave return date blank for one-way</p>
+
+  <div class="row2">
+    <div>
+      <label for="target_price">Target price</label>
+      <input type="number" id="target_price" placeholder="650" min="1" step="1" required>
+    </div>
+    <div>
+      <label for="currency">Currency</label>
+      <select id="currency">
+        <option value="usd">USD</option>
+        <option value="eur">EUR</option>
+        <option value="gbp">GBP</option>
+        <option value="myr">MYR</option>
+        <option value="sgd">SGD</option>
+        <option value="aud">AUD</option>
+        <option value="jpy">JPY</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="status"></div>
+</form>
+
+<script>
+  // ---- EDIT THIS after deploying your Cloudflare Worker ----
+  const WORKER_URL = "https://YOUR-WORKER-NAME.YOUR-SUBDOMAIN.workers.dev/submit";
+  // ------------------------------------------------------------
+
+  const tg = window.Telegram.WebApp;
+  tg.ready();
+  tg.expand();
+
+  const form = document.getElementById("routeForm");
+  const statusEl = document.getElementById("status");
+
+  function setStatus(kind, text) {
+    statusEl.className = kind;
+    statusEl.textContent = text;
+  }
+
+  function currentValues() {
+    return {
+      route_name: document.getElementById("route_name").value.trim(),
+      origin: document.getElementById("origin").value.trim().toUpperCase(),
+      destination: document.getElementById("destination").value.trim().toUpperCase(),
+      departure_date: document.getElementById("departure_date").value,
+      return_date: document.getElementById("return_date").value,
+      target_price: document.getElementById("target_price").value,
+      currency: document.getElementById("currency").value,
+    };
+  }
+
+  function validate(values) {
+    if (!values.route_name) return "Please enter a route name.";
+    if (values.origin.length !== 3) return "Departure IATA code must be 3 letters.";
+    if (values.destination.length !== 3) return "Destination IATA code must be 3 letters.";
+    if (!values.departure_date) return "Please choose a departure date.";
+    if (!values.target_price || Number(values.target_price) <= 0) return "Please enter a valid target price.";
+    return null;
+  }
+
+  async function submitRoute() {
+    const values = currentValues();
+    const error = validate(values);
+    if (error) {
+      setStatus("error", error);
+      tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("error");
+      return;
+    }
+
+    setStatus("loading", "Submitting…");
+    tg.MainButton.showProgress();
+
+    try {
+      const resp = await fetch(WORKER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          initData: tg.initData,
+          ...values,
+        }),
+      });
+      const data = await resp.json();
+
+      if (!resp.ok || !data.ok) {
+        throw new Error(data.error || `Request failed (${resp.status})`);
+      }
+
+      setStatus("success", "✅ Route saved! Check Telegram for confirmation shortly.");
+      tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
+      setTimeout(() => tg.close(), 1800);
+    } catch (err) {
+      setStatus("error", "Failed: " + err.message);
+      tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("error");
+    } finally {
+      tg.MainButton.hideProgress();
+    }
+  }
+
+  tg.MainButton.setText("Save Route");
+  tg.MainButton.show();
+  tg.MainButton.onClick(submitRoute);
+
+  form.addEventListener("submit", (e) => e.preventDefault());
+</script>
+
+</body>
+</html>
