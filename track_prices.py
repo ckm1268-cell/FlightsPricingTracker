@@ -5,7 +5,10 @@ Flight Price Tracker
 Checks fares for specific departure/return dates (via the Travelpayouts
 week-matrix API, which returns prices for a 7-day window around the dates
 you give it) against target prices in config.yaml, and sends a Telegram
-alert - and optionally an email - when a target is met.
+alert (primary) plus a WhatsApp alert via CallMeBot (secondary, best-effort
+- CallMeBot is a free hobby service and can be unreliable, so failures here
+never block the Telegram alert) - and optionally an email - when a target
+is met.
 
 Required environment variables (set as GitHub Actions secrets):
   TRAVELPAYOUTS_TOKEN  - free token from https://www.travelpayouts.com
@@ -13,8 +16,9 @@ Required environment variables (set as GitHub Actions secrets):
   TELEGRAM_BOT_TOKEN   - token from @BotFather (see README)
   TELEGRAM_CHAT_ID     - your personal chat ID (see README)
 
-Optional (only used if all three are set - keeps email as a backup channel):
-  GMAIL_USER, GMAIL_APP_PASSWORD, NOTIFY_EMAIL
+Optional:
+  CALLMEBOT_PHONE, CALLMEBOT_APIKEY  - WhatsApp via CallMeBot (see README)
+  GMAIL_USER, GMAIL_APP_PASSWORD, NOTIFY_EMAIL  - email backup channel
 """
 
 import os
@@ -24,6 +28,7 @@ import sys
 from email.mime.text import MIMEText
 from pathlib import Path
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 import requests
 import yaml
@@ -36,12 +41,18 @@ TRAVELPAYOUTS_TOKEN = os.environ.get("TRAVELPAYOUTS_TOKEN")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
+CALLMEBOT_PHONE = os.environ.get("CALLMEBOT_PHONE")
+CALLMEBOT_APIKEY = os.environ.get("CALLMEBOT_APIKEY")
+
 GMAIL_USER = os.environ.get("GMAIL_USER")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
 NOTIFY_EMAIL = os.environ.get("NOTIFY_EMAIL", GMAIL_USER)
 
 WEEK_MATRIX_URL = "https://api.travelpayouts.com/v2/prices/week-matrix"
 CHEAP_URL = "https://api.travelpayouts.com/v1/prices/cheap"
+AIRLINES_URL = "https://api.travelpayouts.com/data/en/airlines.json"
+
+_airline_name_cache = None  # populated once per run, on first lookup
 
 
 def load_config():
@@ -127,9 +138,77 @@ def get_cheapest_month_price(origin, destination, currency):
                     "value": price,
                     "depart_date": flight.get("departure_at"),
                     "return_date": flight.get("return_at"),
+                    "airline": flight.get("airline"),  # IATA code, e.g. "MH"
                     "approximate": True,
                 }
     return best
+
+
+def get_airline_name(iata_code):
+    """
+    Resolves a 2-letter IATA airline code (e.g. "MH") to a readable name
+    (e.g. "Malaysia Airlines"). Fetches Travelpayouts' static airline list
+    once per run and caches it in memory. Falls back to the raw code if
+    the lookup fails or the code isn't found - never raises.
+    """
+    global _airline_name_cache
+    if not iata_code:
+        return None
+
+    if _airline_name_cache is None:
+        try:
+            resp = requests.get(AIRLINES_URL, timeout=15)
+            resp.raise_for_status()
+            airlines = resp.json()
+            _airline_name_cache = {a.get("iata"): a.get("name") for a in airlines if a.get("iata")}
+        except Exception as e:
+            print(f"  Could not load airline name list (non-fatal): {e}")
+            _airline_name_cache = {}
+
+    return _airline_name_cache.get(iata_code, iata_code)
+
+
+def get_airline_for_date(origin, destination, currency, target_depart_date):
+    """
+    Best-effort lookup for which airline is behind a given price, used to
+    enrich week-matrix results (which don't include an airline field).
+    Queries prices/cheap and picks the entry whose departure date matches
+    target_depart_date most closely. Returns an IATA airline code, or None
+    if nothing useful is found.
+    """
+    if not target_depart_date:
+        return None
+    try:
+        params = {
+            "origin": origin,
+            "destination": destination,
+            "currency": currency,
+            "token": TRAVELPAYOUTS_TOKEN,
+        }
+        resp = requests.get(CHEAP_URL, params=params, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        if not data.get("success") or not data.get("data"):
+            return None
+
+        target = target_depart_date[:10]  # just the date part, YYYY-MM-DD
+        best_match = None
+        best_diff = None
+        for dest_data in data["data"].values():
+            for flight in dest_data.values():
+                dep = flight.get("departure_at")
+                if not dep:
+                    continue
+                diff = abs((datetime.fromisoformat(dep[:10]) - datetime.fromisoformat(target)).days)
+                if best_diff is None or diff < best_diff:
+                    best_diff = diff
+                    best_match = flight
+
+        if best_match and best_diff is not None and best_diff <= 3:
+            return best_match.get("airline")
+    except Exception as e:
+        print(f"  Could not look up airline for date (non-fatal): {e}")
+    return None
 
 
 def send_telegram(text):
@@ -144,6 +223,24 @@ def send_telegram(text):
         print(f"Telegram message sent (status {resp.status_code})")
     except Exception as e:
         print(f"Failed to send Telegram message: {e}")
+
+
+def send_whatsapp(text):
+    if not (CALLMEBOT_PHONE and CALLMEBOT_APIKEY):
+        print("CallMeBot credentials missing - skipping WhatsApp send (optional channel). "
+              "Set CALLMEBOT_PHONE and CALLMEBOT_APIKEY as secrets to enable it.")
+        return
+    url = (
+        "https://api.callmebot.com/whatsapp.php"
+        f"?phone={quote(CALLMEBOT_PHONE)}&text={quote(text)}&apikey={CALLMEBOT_APIKEY}"
+    )
+    try:
+        resp = requests.get(url, timeout=30)
+        print(f"WhatsApp send status: {resp.status_code} - {resp.text[:200]}")
+    except Exception as e:
+        # Best-effort only - CallMeBot is a free hobby service and can be
+        # flaky. Never let a WhatsApp failure block the Telegram alert.
+        print(f"Failed to send WhatsApp message (non-fatal, Telegram is primary): {e}")
 
 
 def send_email(subject, body):
@@ -187,6 +284,11 @@ def main():
             if best is None:
                 print(f"  No exact-date data for {key}, trying broader monthly lookup...")
                 best = get_cheapest_month_price(route["origin"], route["destination"], route["currency"])
+            elif "airline" not in best:
+                # week-matrix doesn't return airline info - try a best-effort lookup
+                best["airline"] = get_airline_for_date(
+                    route["origin"], route["destination"], route["currency"], best.get("depart_date")
+                )
         except Exception as e:
             print(f"  Failed to fetch price for {key}: {e}")
             continue
@@ -198,7 +300,10 @@ def main():
         price = best["value"]
         target = route["target_price"]
         was_under_target = history.get(key, {}).get("under_target", False)
-        print(f"  Cheapest found: {price} {route['currency']} (target: {target})")
+        airline_code = best.get("airline")
+        airline_name = get_airline_name(airline_code) if airline_code else None
+        airline_display = f" via {airline_name}" if airline_name else ""
+        print(f"  Cheapest found: {price} {route['currency']}{airline_display} (target: {target})")
 
         is_under_target = price <= target
 
@@ -212,6 +317,7 @@ def main():
                 "depart_date": best.get("depart_date"),
                 "return_date": best.get("return_date"),
                 "approximate": best.get("approximate", False),
+                "airline": airline_name,
             })
 
         history[key] = {
@@ -226,12 +332,15 @@ def main():
         lines = [f"✈️ Flight price alert: {len(alerts)} route(s) hit your target!\n"]
         for a in alerts:
             note = " (approx. dates - verify before booking)" if a.get("approximate") else ""
+            airline_note = f" | Airline: {a['airline']}" if a.get("airline") else ""
             lines.append(
                 f"- {a['name']}: {a['price']} {a['currency']} (target {a['target']}) "
-                f"| depart {a.get('depart_date', 'N/A')} / return {a.get('return_date', 'N/A')}{note}"
+                f"| depart {a.get('depart_date', 'N/A')} / return {a.get('return_date', 'N/A')}"
+                f"{airline_note}{note}"
             )
         body = "\n".join(lines)
-        send_telegram(body)
+        send_telegram(body)       # primary channel
+        send_whatsapp(body)       # secondary, best-effort
         send_email(f"Flight price alert: {len(alerts)} route(s) hit your target", body)
     else:
         print("No new alerts this run.")
