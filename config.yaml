@@ -4,5 +4,5 @@ routes:
   destination: HKG
   departure_date: '2026-07-17'
   return_date: '2026-07-24'
-  target_price: 1600.0
+  target_price: 1650.0
   currency: myr
