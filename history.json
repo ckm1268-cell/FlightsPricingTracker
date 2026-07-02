@@ -28,5 +28,10 @@
     "last_checked": "2026-07-02T07:24:07.508851+00:00",
     "last_price": 4868,
     "under_target": false
+  },
+  "NYC-TYO-2026-07-08": {
+    "last_checked": "2026-07-02T07:29:12.833852+00:00",
+    "last_price": 4168,
+    "under_target": true
   }
 }
