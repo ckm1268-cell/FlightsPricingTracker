@@ -5,14 +5,30 @@
     "under_target": false
   },
   "KUL-CAN-2026-09-24": {
-    "last_checked": "2026-07-01T23:44:49.837807+00:00",
-    "last_price": 769,
-    "under_target": false
+    "last_checked": "2026-07-02T11:59:42.326001+00:00",
+    "last_price": 1139,
+    "under_target": true,
+    "consecutive_failures": 0,
+    "failure_alert_sent": false,
+    "price_log": [
+      {
+        "date": "2026-07-02T11:59:42.326001+00:00",
+        "price": 1139
+      }
+    ]
   },
   "KUL-BTH-2026-09-24": {
-    "last_checked": "2026-07-01T23:35:34.601523+00:00",
-    "last_price": 490,
-    "under_target": false
+    "last_checked": "2026-07-02T11:59:42.326001+00:00",
+    "last_price": 457,
+    "under_target": false,
+    "consecutive_failures": 0,
+    "failure_alert_sent": false,
+    "price_log": [
+      {
+        "date": "2026-07-02T11:59:42.326001+00:00",
+        "price": 457
+      }
+    ]
   },
   "NYC-TYO-2026-09-24": {
     "last_checked": "2026-07-02T00:03:23.140677+00:00",
