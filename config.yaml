@@ -1,8 +1,8 @@
 routes:
-- name: Kuala Lumpur to New York
+- name: Kuala Lumpur to Batam
   origin: KUL
-  destination: NYC
-  departure_date: '2026-07-17'
-  return_date: '2026-07-31'
-  target_price: 6650.0
-  currency: usd
+  destination: BTH
+  departure_date: '2026-07-10'
+  return_date: '2026-07-16'
+  target_price: 2650.0
+  currency: myr
