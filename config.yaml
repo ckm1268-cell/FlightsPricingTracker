@@ -6,10 +6,3 @@ routes:
   return_date: '2026-08-08'
   target_price: 2650.0
   currency: myr
-- name: Kuala Lumpur to Batam
-  origin: KUL
-  destination: BTH
-  departure_date: '2026-09-24'
-  return_date: '2026-09-27'
-  target_price: 500.0
-  currency: myr
