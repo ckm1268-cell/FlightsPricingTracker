@@ -6,13 +6,6 @@ routes:
   return_date: '2026-09-27'
   target_price: 350.0
   currency: myr
-- name: Kuala Lumpur to Guangzhou
-  origin: KUL
-  destination: CAN
-  departure_date: '2026-07-20'
-  return_date: '2026-07-26'
-  target_price: 1898.0
-  currency: myr
 - name: New York to Tokyo
   origin: NYC
   destination: TYO
