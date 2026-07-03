@@ -53,6 +53,8 @@ GMAIL_USER = os.environ.get("GMAIL_USER")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD")
 NOTIFY_EMAIL = os.environ.get("NOTIFY_EMAIL", GMAIL_USER)
 
+TRAVELPAYOUTS_MARKER = os.environ.get("TRAVELPAYOUTS_MARKER")  # optional, for affiliate tracking
+
 WEEK_MATRIX_URL = "https://api.travelpayouts.com/v2/prices/week-matrix"
 CHEAP_URL = "https://api.travelpayouts.com/v1/prices/cheap"
 AIRLINES_URL = "https://api.travelpayouts.com/data/en/airlines.json"
@@ -175,6 +177,31 @@ def get_airline_name(iata_code):
             _airline_name_cache = {}
 
     return _airline_name_cache.get(iata_code, iata_code)
+
+
+def build_booking_link(origin, destination, depart_date, return_date=None):
+    """
+    Builds an Aviasales search results deep-link, e.g.
+    https://www.aviasales.com/search/NYC1009TYO2009O1
+    Format: origin + DDMM(depart) + destination + [DDMM(return)] + passenger_count
+    This is Aviasales' standard public search-link format - no partner
+    approval needed, just opens a live search results page. If
+    TRAVELPAYOUTS_MARKER is set, appends it for affiliate tracking.
+    """
+    try:
+        depart = datetime.fromisoformat(depart_date[:10])
+        code = f"{origin}{depart.day:02d}{depart.month:02d}{destination}"
+        if return_date:
+            ret = datetime.fromisoformat(return_date[:10])
+            code += f"{ret.day:02d}{ret.month:02d}"
+        code += "1"  # 1 adult passenger
+        link = f"https://www.aviasales.com/search/{code}"
+        if TRAVELPAYOUTS_MARKER:
+            link += f"?marker={TRAVELPAYOUTS_MARKER}"
+        return link
+    except Exception as e:
+        print(f"  Could not build booking link (non-fatal): {e}")
+        return None
 
 
 def get_airline_for_date(origin, destination, currency, target_depart_date):
@@ -453,6 +480,9 @@ def main():
 
         # Only alert on a fresh drop below target (avoids repeat spam every run)
         if is_under_target and not was_under_target:
+            booking_link = build_booking_link(
+                route["origin"], route["destination"], best.get("depart_date"), best.get("return_date")
+            )
             alerts.append({
                 "name": route["name"],
                 "price": price,
@@ -466,6 +496,7 @@ def main():
                 "is_lowest_in_window": is_lowest_in_window,
                 "deal_quality": deal_quality,
                 "price_log": price_log,
+                "booking_link": booking_link,
             })
 
         entry.update({
@@ -486,10 +517,11 @@ def main():
             airline_note = f" | Airline: {a['airline']}{airline_suffix}" if a.get("airline") else ""
             trend_note = " | Lowest in 30 days" if a.get("is_lowest_in_window") else ""
             deal_note = f" | {a['deal_quality']}" if a.get("deal_quality") else ""
+            link_line = f"\n  \U0001F517 {a['booking_link']}" if a.get("booking_link") else ""
             lines.append(
                 f"- {a['name']}: {a['price']} {a['currency']} (target {a['target']}) "
                 f"| depart {a.get('depart_date', 'N/A')} / return {a.get('return_date', 'N/A')}"
-                f"{airline_note}{trend_note}{deal_note}{note}"
+                f"{airline_note}{trend_note}{deal_note}{note}{link_line}"
             )
         body = "\n".join(lines)
         send_telegram(body)       # primary channel
