@@ -181,24 +181,21 @@ def get_airline_name(iata_code):
 
 def build_booking_link(origin, destination, depart_date, return_date=None):
     """
-    Builds an Aviasales search results deep-link, e.g.
-    https://www.aviasales.com/search/NYC1009TYO2009O1
-    Format: origin + DDMM(depart) + destination + [DDMM(return)] + passenger_count
-    This is Aviasales' standard public search-link format - no partner
-    approval needed, just opens a live search results page. If
-    TRAVELPAYOUTS_MARKER is set, appends it for affiliate tracking.
+    Builds a Skyscanner Malaysia search-results deep-link, e.g.
+    https://www.skyscanner.com.my/transport/flights/kul/bkk/261001/261010/
+    The .com.my domain defaults to MYR pricing and Malaysia region - no
+    partner approval needed, this is the same URL structure Skyscanner's
+    own website produces for a manual search.
+    Format: /transport/flights/{origin}/{destination}/{YYMMDD depart}/[{YYMMDD return}/]
     """
     try:
         depart = datetime.fromisoformat(depart_date[:10])
-        code = f"{origin}{depart.day:02d}{depart.month:02d}{destination}"
+        depart_code = depart.strftime("%y%m%d")
+        path = f"/transport/flights/{origin.lower()}/{destination.lower()}/{depart_code}/"
         if return_date:
             ret = datetime.fromisoformat(return_date[:10])
-            code += f"{ret.day:02d}{ret.month:02d}"
-        code += "1"  # 1 adult passenger
-        link = f"https://www.aviasales.com/search/{code}"
-        if TRAVELPAYOUTS_MARKER:
-            link += f"?marker={TRAVELPAYOUTS_MARKER}"
-        return link
+            path += f"{ret.strftime('%y%m%d')}/"
+        return f"https://www.skyscanner.com.my{path}?adultsv2=1&cabinclass=economy"
     except Exception as e:
         print(f"  Could not build booking link (non-fatal): {e}")
         return None
