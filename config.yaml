@@ -27,3 +27,10 @@ routes:
   return_date: '2026-09-30'
   target_price: 1200.0
   currency: usd
+- name: Kuala Lumpur to Beijing
+  origin: KUL
+  destination: PEK
+  departure_date: '2026-09-07'
+  return_date: '2026-09-14'
+  target_price: 2100.0
+  currency: myr
