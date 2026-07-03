@@ -11,6 +11,11 @@
  *      already knows how to parse, with the "add-route" label attached.
  *   4. Your existing GitHub Actions pipeline takes it from there, unchanged.
  *
+ * Also exposes GET /routes so the Mini App can show what's currently being
+ * tracked when it loads (reads config.yaml directly from the public repo
+ * via raw.githubusercontent.com - no GitHub token needed for this, since
+ * the repo is public).
+ *
  * Required Worker secrets/variables (set in Cloudflare dashboard):
  *   BOT_TOKEN      (secret) - your Telegram bot token from @BotFather
  *   GITHUB_TOKEN   (secret) - a fine-grained GitHub PAT scoped to just this
@@ -34,7 +39,7 @@ const FIELD_LABELS = {
 function corsHeaders(env) {
   return {
     "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN || "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
 }
@@ -91,20 +96,57 @@ async function validateInitData(initData, botToken, maxAgeSeconds = 86400) {
   return { valid: true, user };
 }
 
+function stripQuotes(v) {
+  v = v.trim();
+  if ((v.startsWith("'") && v.endsWith("'")) || (v.startsWith('"') && v.endsWith('"'))) {
+    return v.slice(1, -1);
+  }
+  return v;
+}
+
+/**
+ * Minimal parser for config.yaml's fixed structure (as produced by
+ * track_prices.py's own yaml.dump call). Not a general YAML parser -
+ * relies on the known "routes:\n- name: X\n  origin: Y\n  ..." shape.
+ */
+function parseRoutesYaml(text) {
+  const lines = text.split("\n");
+  const routes = [];
+  let current = null;
+  for (const raw of lines) {
+    const line = raw.replace(/\r$/, "");
+    const itemMatch = line.match(/^-\s*(\w+):\s*(.*)$/);
+    const fieldMatch = line.match(/^\s+(\w+):\s*(.*)$/);
+    if (itemMatch) {
+      if (current) routes.push(current);
+      current = {};
+      current[itemMatch[1]] = stripQuotes(itemMatch[2]);
+    } else if (fieldMatch && current) {
+      current[fieldMatch[1]] = stripQuotes(fieldMatch[2]);
+    }
+  }
+  if (current) routes.push(current);
+  return routes;
+}
+
+async function fetchCurrentRoutes(env) {
+  const url = `https://raw.githubusercontent.com/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/main/config.yaml`;
+  const resp = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
+  if (!resp.ok) {
+    throw new Error(`Could not fetch config.yaml (${resp.status})`);
+  }
+  const text = await resp.text();
+  return parseRoutesYaml(text);
+}
+
 function buildIssueBody(fields) {
   return Object.entries(FIELD_LABELS)
     .map(([key, label]) => `### ${label}\n\n${fields[key] || "_No response_"}`)
     .join("\n\n");
 }
 
-async function createGithubIssue(env, fields) {
+async function createIssue(env, { title, body, labels }) {
   const url = `https://api.github.com/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/issues`;
-  const body = {
-    title: `Add route: ${fields.route_name}`,
-    body: buildIssueBody(fields),
-    labels: ["add-route"],
-  };
-
   const resp = await fetch(url, {
     method: "POST",
     headers: {
@@ -113,7 +155,7 @@ async function createGithubIssue(env, fields) {
       "User-Agent": "flight-tracker-mini-app-worker",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ title, body, labels }),
   });
 
   if (!resp.ok) {
@@ -121,6 +163,22 @@ async function createGithubIssue(env, fields) {
     throw new Error(`GitHub API error (${resp.status}): ${text.slice(0, 300)}`);
   }
   return await resp.json();
+}
+
+async function createGithubIssue(env, fields) {
+  return createIssue(env, {
+    title: `Add route: ${fields.route_name}`,
+    body: buildIssueBody(fields),
+    labels: ["add-route"],
+  });
+}
+
+async function createRemoveIssue(env, origin, destination) {
+  return createIssue(env, {
+    title: `Remove route: ${origin} -> ${destination}`,
+    body: `### Origin\n\n${origin}\n\n### Destination\n\n${destination}`,
+    labels: ["remove-route"],
+  });
 }
 
 function validateFields(fields) {
@@ -148,6 +206,76 @@ export default {
     }
 
     const url = new URL(request.url);
+
+    if (url.pathname === "/routes" && request.method === "GET") {
+      const initData = url.searchParams.get("initData") || "";
+      const check = await validateInitData(initData, env.BOT_TOKEN);
+      if (!check.valid) {
+        return new Response(JSON.stringify({ ok: false, error: "Unauthorized: " + check.reason }), {
+          status: 401,
+          headers: { ...headers, "Content-Type": "application/json" },
+        });
+      }
+      try {
+        const routes = await fetchCurrentRoutes(env);
+        return new Response(JSON.stringify({ ok: true, routes }), {
+          status: 200,
+          headers: { ...headers, "Content-Type": "application/json" },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ ok: false, error: err.message }), {
+          status: 500,
+          headers: { ...headers, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    if (url.pathname === "/remove" && request.method === "POST") {
+      let payload;
+      try {
+        payload = await request.json();
+      } catch (_) {
+        return new Response(JSON.stringify({ ok: false, error: "Invalid JSON body" }), {
+          status: 400,
+          headers: { ...headers, "Content-Type": "application/json" },
+        });
+      }
+
+      const { initData, origin, destination } = payload;
+      if (!initData) {
+        return new Response(JSON.stringify({ ok: false, error: "Missing initData" }), {
+          status: 400,
+          headers: { ...headers, "Content-Type": "application/json" },
+        });
+      }
+      const check = await validateInitData(initData, env.BOT_TOKEN);
+      if (!check.valid) {
+        return new Response(JSON.stringify({ ok: false, error: "Unauthorized: " + check.reason }), {
+          status: 401,
+          headers: { ...headers, "Content-Type": "application/json" },
+        });
+      }
+      if (!origin || !destination) {
+        return new Response(JSON.stringify({ ok: false, error: "Missing origin or destination" }), {
+          status: 400,
+          headers: { ...headers, "Content-Type": "application/json" },
+        });
+      }
+
+      try {
+        const issue = await createRemoveIssue(env, origin, destination);
+        return new Response(JSON.stringify({ ok: true, issue_number: issue.number }), {
+          status: 200,
+          headers: { ...headers, "Content-Type": "application/json" },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ ok: false, error: err.message }), {
+          status: 500,
+          headers: { ...headers, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     if (url.pathname !== "/submit" || request.method !== "POST") {
       return new Response(JSON.stringify({ ok: false, error: "Not found" }), {
         status: 404,
