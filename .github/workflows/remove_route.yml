@@ -1,0 +1,74 @@
+name: Remove Route From Issue
+
+on:
+  issues:
+    types: [opened, reopened, edited]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: repo-config-writes
+  cancel-in-progress: false
+
+jobs:
+  remove-route:
+    if: contains(github.event.issue.labels.*.name, 'remove-route')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Pull latest changes
+        run: git pull --rebase origin main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install PyYAML
+
+      - name: Parse issue and update config.yaml
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: python scripts/remove_route.py
+
+      - name: Commit updated config
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Remove route from issue #${{ github.event.issue.number }} [skip ci]"
+          file_pattern: config.yaml
+
+      - name: Comment confirmation and close issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const confirmation = fs.readFileSync('route_confirmation.txt', 'utf8');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `\u2705 ${confirmation}`,
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed',
+            });
+
+      - name: Comment failure reason
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `\u274c Couldn't process this removal. Full error log is in the Actions tab.`,
+            });
