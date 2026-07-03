@@ -95,6 +95,25 @@
   .route-card .route-detail {
     color: var(--tg-theme-hint-color, #888888);
   }
+  .route-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .route-card .route-remove-btn {
+    background: none;
+    border: none;
+    color: #e74c3c;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .route-card .route-remove-btn:disabled {
+    opacity: 0.4;
+  }
 </style>
 </head>
 <body>
@@ -158,9 +177,10 @@
 
 <script>
   // ---- EDIT THIS after deploying your Cloudflare Worker ----
-    const WORKER_URL = "https://flight-tracker-bridge.ckm1268.workers.dev/submit";
+  const WORKER_URL = "https://YOUR-WORKER-NAME.YOUR-SUBDOMAIN.workers.dev/submit";
   // ------------------------------------------------------------
   const WORKER_ROUTES_URL = WORKER_URL.replace(/\/submit\/?$/, "") + "/routes";
+  const WORKER_REMOVE_URL = WORKER_URL.replace(/\/submit\/?$/, "") + "/remove";
 
   const tg = window.Telegram.WebApp;
   tg.ready();
@@ -191,15 +211,45 @@
         '<p class="hint" style="margin-bottom:8px;">Currently tracking:</p>' +
         data.routes.map((r) => `
           <div class="route-card">
-            <div class="route-name">${escapeHtml(r.name || `${r.origin}-${r.destination}`)}</div>
-            <div class="route-detail">${escapeHtml(r.origin)} → ${escapeHtml(r.destination)}
-              | depart ${escapeHtml(r.departure_date || "?")}${r.return_date ? ` / return ${escapeHtml(r.return_date)}` : " (one-way)"}
-              | target ${escapeHtml(r.target_price)} ${escapeHtml((r.currency || "").toUpperCase())}
+            <div>
+              <div class="route-name">${escapeHtml(r.name || `${r.origin}-${r.destination}`)}</div>
+              <div class="route-detail">${escapeHtml(r.origin)} → ${escapeHtml(r.destination)}
+                | depart ${escapeHtml(r.departure_date || "?")}${r.return_date ? ` / return ${escapeHtml(r.return_date)}` : " (one-way)"}
+                | target ${escapeHtml(r.target_price)} ${escapeHtml((r.currency || "").toUpperCase())}
+              </div>
             </div>
+            <button class="route-remove-btn" data-origin="${escapeHtml(r.origin)}" data-destination="${escapeHtml(r.destination)}">Remove</button>
           </div>
         `).join("");
+
+      currentRoutesEl.querySelectorAll(".route-remove-btn").forEach((btn) => {
+        btn.addEventListener("click", () => removeRoute(btn.dataset.origin, btn.dataset.destination, btn));
+      });
     } catch (err) {
       currentRoutesEl.innerHTML = `<p class="hint">Could not load current routes (${escapeHtml(err.message)}).</p>`;
+    }
+  }
+
+  async function removeRoute(origin, destination, btnEl) {
+    if (!confirm(`Stop tracking ${origin} → ${destination}?`)) return;
+    btnEl.disabled = true;
+    btnEl.textContent = "Removing…";
+    try {
+      const resp = await fetch(WORKER_REMOVE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ initData: tg.initData, origin, destination }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error(data.error || `Request failed (${resp.status})`);
+      tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
+      setStatus("success", `✅ Removing ${origin} → ${destination}… check Telegram shortly.`);
+      btnEl.closest(".route-card").style.opacity = "0.4";
+    } catch (err) {
+      tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("error");
+      setStatus("error", "Failed to remove: " + err.message);
+      btnEl.disabled = false;
+      btnEl.textContent = "Remove";
     }
   }
 
@@ -227,6 +277,17 @@
     if (values.origin.length !== 3) return "Departure IATA code must be 3 letters.";
     if (values.destination.length !== 3) return "Destination IATA code must be 3 letters.";
     if (!values.departure_date) return "Please choose a departure date.";
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const departure = new Date(values.departure_date + "T00:00:00");
+    if (departure < today) return "Departure date can't be in the past.";
+
+    if (values.return_date) {
+      const returnD = new Date(values.return_date + "T00:00:00");
+      if (returnD <= departure) return "Return date must be after the departure date.";
+    }
+
     if (!values.target_price || Number(values.target_price) <= 0) return "Please enter a valid target price.";
     return null;
   }
