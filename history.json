@@ -127,7 +127,7 @@
   "KUL-CAN-2026-09-16": {
     "consecutive_failures": 0,
     "failure_alert_sent": false,
-    "last_checked": "2026-07-03T05:45:13.217820+00:00",
+    "last_checked": "2026-07-03T05:45:48.554573+00:00",
     "last_price": 943,
     "under_target": true,
     "price_log": [
@@ -138,18 +138,26 @@
       {
         "date": "2026-07-03T05:45:13.217820+00:00",
         "price": 943
+      },
+      {
+        "date": "2026-07-03T05:45:48.554573+00:00",
+        "price": 943
       }
     ]
   },
   "NYC-TYO-2026-07-13": {
     "consecutive_failures": 0,
     "failure_alert_sent": false,
-    "last_checked": "2026-07-03T05:45:13.217820+00:00",
+    "last_checked": "2026-07-03T05:45:48.554573+00:00",
     "last_price": 1393,
     "under_target": true,
     "price_log": [
       {
         "date": "2026-07-03T05:45:13.217820+00:00",
+        "price": 1393
+      },
+      {
+        "date": "2026-07-03T05:45:48.554573+00:00",
         "price": 1393
       }
     ]
@@ -157,12 +165,16 @@
   "KUL-TYO-2026-07-27": {
     "consecutive_failures": 0,
     "failure_alert_sent": false,
-    "last_checked": "2026-07-03T05:45:13.217820+00:00",
+    "last_checked": "2026-07-03T05:45:48.554573+00:00",
     "last_price": 1547,
     "under_target": true,
     "price_log": [
       {
         "date": "2026-07-03T05:45:13.217820+00:00",
+        "price": 1547
+      },
+      {
+        "date": "2026-07-03T05:45:48.554573+00:00",
         "price": 1547
       }
     ]
