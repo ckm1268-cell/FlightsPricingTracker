@@ -18,5 +18,5 @@ routes:
   destination: BTH
   departure_date: '2026-09-24'
   return_date: '2026-09-27'
-  target_price: 350.0
+  target_price: 500.0
   currency: myr
