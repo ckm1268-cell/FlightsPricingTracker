@@ -13,3 +13,10 @@ routes:
   return_date: '2026-09-20'
   target_price: 1988.0
   currency: myr
+- name: New York to Tokyo
+  origin: NYC
+  destination: TYO
+  departure_date: '2026-07-13'
+  return_date: '2026-07-31'
+  target_price: 6650.0
+  currency: usd
