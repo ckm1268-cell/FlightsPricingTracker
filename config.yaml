@@ -16,7 +16,7 @@ routes:
 - name: New York to Tokyo
   origin: NYC
   destination: TYO
-  departure_date: '2026-06-08'
-  return_date: '2026-06-30'
-  target_price: 6650.0
+  departure_date: '2026-07-06'
+  return_date: '2026-07-31'
+  target_price: 6888.0
   currency: usd
