@@ -20,3 +20,10 @@ routes:
   return_date: '2026-07-31'
   target_price: 6650.0
   currency: usd
+- name: Kuala Lumpur to Tokyo
+  origin: KUL
+  destination: TYO
+  departure_date: '2026-07-27'
+  return_date: '2026-08-08'
+  target_price: 2650.0
+  currency: myr
