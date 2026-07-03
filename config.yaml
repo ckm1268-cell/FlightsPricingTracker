@@ -1,11 +1,4 @@
 routes:
-- name: Kuala Lumpur to Guangzhou
-  origin: KUL
-  destination: CAN
-  departure_date: '2026-09-16'
-  return_date: '2026-09-20'
-  target_price: 1988.0
-  currency: myr
 - name: Kuala Lumpur to Tokyo
   origin: KUL
   destination: TYO
