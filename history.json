@@ -5,8 +5,8 @@
     "under_target": false
   },
   "KUL-CAN-2026-09-24": {
-    "last_checked": "2026-07-03T21:44:36.008817+00:00",
-    "last_price": 801,
+    "last_checked": "2026-07-03T22:35:17.098673+00:00",
+    "last_price": 790,
     "under_target": true,
     "consecutive_failures": 0,
     "failure_alert_sent": false,
@@ -30,11 +30,15 @@
       {
         "date": "2026-07-03T21:44:36.008817+00:00",
         "price": 801
+      },
+      {
+        "date": "2026-07-03T22:35:17.098673+00:00",
+        "price": 790
       }
     ]
   },
   "KUL-BTH-2026-09-24": {
-    "last_checked": "2026-07-03T21:44:36.008817+00:00",
+    "last_checked": "2026-07-03T22:35:17.098673+00:00",
     "last_price": 457,
     "under_target": false,
     "consecutive_failures": 0,
@@ -98,6 +102,10 @@
       },
       {
         "date": "2026-07-03T21:44:36.008817+00:00",
+        "price": 457
+      },
+      {
+        "date": "2026-07-03T22:35:17.098673+00:00",
         "price": 457
       }
     ]
@@ -274,7 +282,7 @@
   "KUL-TYO-2026-09-21": {
     "consecutive_failures": 0,
     "failure_alert_sent": false,
-    "last_checked": "2026-07-03T21:44:36.008817+00:00",
+    "last_checked": "2026-07-03T22:35:17.098673+00:00",
     "last_price": 1419,
     "under_target": true,
     "price_log": [
@@ -293,13 +301,17 @@
       {
         "date": "2026-07-03T21:44:36.008817+00:00",
         "price": 1419
+      },
+      {
+        "date": "2026-07-03T22:35:17.098673+00:00",
+        "price": 1419
       }
     ]
   },
   "NYC-TYO-2026-09-21": {
     "consecutive_failures": 0,
     "failure_alert_sent": false,
-    "last_checked": "2026-07-03T21:44:36.008817+00:00",
+    "last_checked": "2026-07-03T22:35:17.098673+00:00",
     "last_price": 1072,
     "under_target": true,
     "price_log": [
@@ -318,14 +330,18 @@
       {
         "date": "2026-07-03T21:44:36.008817+00:00",
         "price": 1072
+      },
+      {
+        "date": "2026-07-03T22:35:17.098673+00:00",
+        "price": 1072
       }
     ]
   },
   "KUL-PEK-2026-09-07": {
     "consecutive_failures": 0,
     "failure_alert_sent": false,
-    "last_checked": "2026-07-03T21:44:36.008817+00:00",
-    "last_price": 1314,
+    "last_checked": "2026-07-03T22:35:17.098673+00:00",
+    "last_price": 1282,
     "under_target": true,
     "price_log": [
       {
@@ -335,6 +351,10 @@
       {
         "date": "2026-07-03T21:44:36.008817+00:00",
         "price": 1314
+      },
+      {
+        "date": "2026-07-03T22:35:17.098673+00:00",
+        "price": 1282
       }
     ]
   }
