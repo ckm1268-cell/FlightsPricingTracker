@@ -1,11 +1,4 @@
 routes:
-- name: Kuala Lumpur to Tokyo
-  origin: KUL
-  destination: TYO
-  departure_date: '2026-09-21'
-  return_date: '2026-09-30'
-  target_price: 1800.0
-  currency: myr
 - name: Kuala Lumpur to Batam
   origin: KUL
   destination: BTH
