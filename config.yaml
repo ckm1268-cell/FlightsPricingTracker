@@ -1,1 +1,8 @@
-routes: []
+routes:
+- name: Kuala Lumpur to Guangzhou
+  origin: KUL
+  destination: CAN
+  departure_date: '2026-11-16'
+  return_date: '2026-11-22'
+  target_price: 1800.0
+  currency: myr
