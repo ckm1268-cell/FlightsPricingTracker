@@ -548,8 +548,8 @@
   "KUL-PEK-2026-09-07": {
     "consecutive_failures": 0,
     "failure_alert_sent": false,
-    "last_checked": "2026-07-13T11:42:47.758506+00:00",
-    "last_price": 1231,
+    "last_checked": "2026-07-13T18:19:29.742309+00:00",
+    "last_price": 1076,
     "under_target": true,
     "price_log": [
       {
@@ -659,6 +659,10 @@
       {
         "date": "2026-07-13T11:42:47.758506+00:00",
         "price": 1231
+      },
+      {
+        "date": "2026-07-13T18:19:29.742309+00:00",
+        "price": 1076
       }
     ]
   },
@@ -678,7 +682,7 @@
   "KUL-CAN-2026-11-23": {
     "consecutive_failures": 0,
     "failure_alert_sent": false,
-    "last_checked": "2026-07-13T11:42:47.758506+00:00",
+    "last_checked": "2026-07-13T18:19:29.742309+00:00",
     "last_price": 814,
     "under_target": true,
     "price_log": [
@@ -736,6 +740,10 @@
       },
       {
         "date": "2026-07-13T11:42:47.758506+00:00",
+        "price": 814
+      },
+      {
+        "date": "2026-07-13T18:19:29.742309+00:00",
         "price": 814
       }
     ]
