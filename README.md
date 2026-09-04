@@ -40,28 +40,36 @@ Telegram/Gmail for notifications. No servers to maintain, no ongoing cost.
 - **Manage everything from your phone**: a Telegram Mini App lets you
   add, update, and remove routes with a native-feeling form, with a
   GitHub Issue Form as an equally capable fallback.
+- **Or manage it from any browser**: a standalone, password-protected web
+  page (`docs/web.html`) does the same add/update/remove job as the
+  Telegram Mini App, for when you'd rather not go through Telegram at all.
 
 ---
 
 ## Architecture
 
 ```
-Telegram Mini App  ──┐
-                      ├──> Cloudflare Worker ──> GitHub Issue ──> GitHub Actions workflow ──> config.yaml
-GitHub Issue Form  ──┘                                                                            │
-                                                                                                    v
-                                                              GitHub Actions (every 3 hrs) ──> track_prices.py
-                                                                                                    │
-                                                                                                    v
-                                                                          Telegram + Email (+ WhatsApp if enabled)
+Telegram Mini App    ──┐
+Standalone Web Page  ──┼──> Cloudflare Worker ──> GitHub Issue ──> GitHub Actions workflow ──> config.yaml
+GitHub Issue Form    ──┘                                                                            │
+                                                                                                      v
+                                                                GitHub Actions (every 3 hrs) ──> track_prices.py
+                                                                                                      │
+                                                                                                      v
+                                                                            Telegram + Email (+ WhatsApp if enabled)
 ```
 
-Two equally valid ways to add/update/remove a route:
+Three equally valid ways to add/update/remove a route:
 1. **Telegram Mini App** - tap your bot's menu button, fill in a form.
-2. **GitHub Issue Form** - Issues → New Issue → "✈️ Add a flight route to track".
+2. **Standalone web page** (`docs/web.html`) - same form, in any browser,
+   protected by a password instead of Telegram.
+3. **GitHub Issue Form** - Issues → New Issue → "✈️ Add a flight route to track".
 
-Both create a labeled GitHub Issue, which a workflow parses into
+All three create a labeled GitHub Issue, which a workflow parses into
 `config.yaml`. The price-checking pipeline doesn't care which one you used.
+The Mini App and the web page share the same Cloudflare Worker - the only
+difference is how each one proves it's really you (Telegram's signed
+session data vs. a password you choose).
 
 ---
 
@@ -80,7 +88,9 @@ Both create a labeled GitHub Issue, which a workflow parses into
 │   └── weekly_digest.py         Weekly summary script
 │
 ├── docs/
-│   └── index.html               Telegram Mini App (hosted via GitHub Pages)
+│   ├── index.html               Telegram Mini App (hosted via GitHub Pages)
+│   └── web.html                 Standalone password-protected web page,
+│                                  same job as the Mini App, no Telegram needed
 │
 ├── cloudflare-worker/
 │   └── worker.js                Reference copy - the LIVE version lives in
@@ -179,13 +189,55 @@ and its opt-in number changes periodically without notice - treat it as a
 nice-to-have, not something to rely on. Telegram is the reliable primary
 channel by design.
 
+### 6. *(Optional)* Set up the standalone web page
+
+Does the same job as the Telegram Mini App (add/update/remove routes) from
+any browser, no Telegram required. It reuses the same GitHub Pages site and
+Cloudflare Worker - if you already did step 5 above, there's very little
+left to do:
+
+1. **Re-deploy the Worker** with the latest `cloudflare-worker/worker.js`
+   (it now handles both the Mini App and the web page - see the file's
+   top comment for what changed). If you haven't set up the Worker at all
+   yet, follow step 5's "Deploy the Cloudflare Worker" instructions first.
+2. **Choose a password** and add it as one more Worker secret, under the
+   same **Settings → Variables and Secrets** page as the others:
+
+   | Name | Type | Value |
+   |---|---|---|
+   | `WEB_ADMIN_KEY` | Secret | A password you choose (treat it like any other password - the Worker checks it on every request) |
+
+   Leaving this secret unset disables the web page's login entirely
+   (Telegram-only requests keep working as before).
+3. **GitHub Pages must already be enabled** (step 5.1) - `docs/web.html`
+   is served from the same site as `docs/index.html`, no separate hosting
+   needed.
+4. **Point the page at your Worker**: edit `docs/web.html`, find the line
+   `const WORKER_URL = "https://YOUR-WORKER-NAME...` and replace it with
+   your actual Worker URL (ending in `/submit`) - the same URL you used
+   for `docs/index.html`.
+5. Visit `https://yourname.github.io/web.html`, enter your password once.
+   The page remembers it in that browser for next time (via `localStorage`
+   - it never leaves your device except as part of the login check itself).
+   Use "Forget saved password" on the page to clear it from a shared or
+   borrowed device.
+
+**Security note:** unlike the Telegram Mini App - which is authenticated by
+Telegram's own signed session data and can't be replayed by someone who
+doesn't have your Telegram session - the web page relies on a single shared
+password. That's an appropriate trade-off for a personal tool only you know
+the URL to, but treat the password like you would any other login: don't
+reuse one from elsewhere, and change it (update the `WEB_ADMIN_KEY` secret)
+if you ever suspect it leaked.
+
 ---
 
 ## Using it day to day
 
 ### Add or update a route
-Via Mini App (tap your bot's menu button) or the GitHub Issue Form
-("✈️ Add a flight route to track"). Fill in:
+Via Mini App (tap your bot's menu button), the standalone web page
+(`docs/web.html`), or the GitHub Issue Form ("✈️ Add a flight route to
+track"). Fill in:
 - Route name (any label)
 - Departure/destination IATA codes
 - *(Optional)* Alternative airports, comma-separated (e.g. `SZX, HKG, MFM`)
@@ -197,8 +249,8 @@ in place rather than duplicating it. Multiple different routes can be
 tracked simultaneously.
 
 ### Remove a route
-Via the Mini App's "Remove" button on any tracked route, or by manually
-deleting its block from `config.yaml`.
+Via the "Remove" button on any tracked route in the Mini App or the
+standalone web page, or by manually deleting its block from `config.yaml`.
 
 ### Check on things anytime
 - **Actions tab → Flight Price Check → Run workflow**: trigger a check manually.
@@ -278,6 +330,11 @@ for bulk changes or removing a route without the Mini App.
   `opened` and `labeled` when a label is attached at creation - our
   workflows intentionally only trigger on `opened`, `reopened`, and
   `edited`.
+- **Web page says "Unauthorized" or keeps asking for the password**: check
+  that `WEB_ADMIN_KEY` is actually set on the Worker (not just typed into
+  the page) and that you re-deployed the latest `worker.js` after adding
+  it. A stale cached password in the browser is cleared automatically on a
+  401 - just re-enter it.
 
 ---
 

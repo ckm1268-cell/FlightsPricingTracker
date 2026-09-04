@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flight Route Tracker - Manage Routes</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --text: #111111;
+    --hint: #767676;
+    --field-bg: #f5f5f5;
+    --border: #d8d8d8;
+    --accent: #2481cc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17212b;
+      --text: #f0f0f0;
+      --hint: #8a97a3;
+      --field-bg: #232e3c;
+      --border: #2f3b48;
+      --accent: #5eb5f7;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 16px;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  h1 {
+    font-size: 20px;
+    margin: 4px 0 4px;
+  }
+  p.subtitle {
+    margin: 0 0 20px;
+    font-size: 14px;
+    color: var(--hint);
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin: 16px 0 6px;
+    color: var(--hint);
+  }
+  input, select, button {
+    font-family: inherit;
+  }
+  input, select {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--field-bg);
+    color: var(--text);
+  }
+  input:focus, select:focus {
+    outline: 2px solid var(--accent);
+  }
+  .hint {
+    font-size: 12px;
+    color: var(--hint);
+    margin-top: 4px;
+  }
+  .row2 {
+    display: flex;
+    gap: 12px;
+  }
+  .row2 > div { flex: 1; }
+  .primary-btn {
+    width: 100%;
+    margin-top: 20px;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #ffffff;
+    cursor: pointer;
+  }
+  .primary-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .text-btn {
+    background: none;
+    border: none;
+    color: var(--hint);
+    font-size: 13px;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+  }
+  #status {
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    display: none;
+  }
+  #status.error { display: block; background: #ffe5e5; color: #b30000; }
+  #status.success { display: block; background: #e3f7e3; color: #1a7a1a; }
+  #status.loading { display: block; background: var(--field-bg); color: var(--hint); }
+  .current-routes { margin-bottom: 20px; }
+  .route-card {
+    background: var(--field-bg);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .route-card .route-name { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+  .route-card .route-detail { color: var(--hint); }
+  .route-card .route-remove-btn {
+    background: none;
+    border: none;
+    color: #e74c3c;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .route-card .route-remove-btn:disabled { opacity: 0.4; }
+
+  #lockScreen { text-align: center; padding-top: 15vh; }
+  #lockScreen .lock-icon { font-size: 40px; margin-bottom: 8px; }
+  #lockScreen input { text-align: center; margin-top: 16px; }
+  #lockScreen .primary-btn { margin-top: 16px; }
+
+  #app { display: none; }
+</style>
+</head>
+<body>
+
+<div id="lockScreen">
+  <div class="lock-icon">&#128274;</div>
+  <h1>Flight Route Tracker</h1>
+  <p class="subtitle">Enter the admin password to manage tracked routes.</p>
+  <input type="password" id="adminKeyInput" placeholder="Password" autocomplete="current-password">
+  <button class="primary-btn" id="unlockBtn">Unlock</button>
+  <div id="lockStatus" class="hint" style="margin-top:12px;"></div>
+</div>
+
+<div id="app">
+  <h1>&#9992;&#65039; Track a flight route</h1>
+  <p class="subtitle">Submitting adds a new route, or updates one with the same From/To if it already exists.</p>
+
+  <div id="currentRoutes" class="current-routes">
+    <p class="hint">Loading current routes&hellip;</p>
+  </div>
+
+  <form id="routeForm">
+    <label for="route_name">Route name</label>
+    <input type="text" id="route_name" placeholder="New York to Tokyo" required>
+
+    <div class="row2">
+      <div>
+        <label for="origin">From (IATA)</label>
+        <input type="text" id="origin" placeholder="NYC" maxlength="3" style="text-transform:uppercase" required>
+      </div>
+      <div>
+        <label for="destination">To (IATA)</label>
+        <input type="text" id="destination" placeholder="TYO" maxlength="3" style="text-transform:uppercase" required>
+      </div>
+    </div>
+    <p class="hint">3-letter airport or city codes</p>
+
+    <div class="row2">
+      <div>
+        <label for="departure_date">Departure date</label>
+        <input type="date" id="departure_date" required>
+      </div>
+      <div>
+        <label for="return_date">Return date</label>
+        <input type="date" id="return_date">
+      </div>
+    </div>
+    <p class="hint">Leave return date blank for one-way</p>
+
+    <div class="row2">
+      <div>
+        <label for="target_price">Target price</label>
+        <input type="number" id="target_price" placeholder="650" min="1" step="1" required>
+      </div>
+      <div>
+        <label for="currency">Currency</label>
+        <select id="currency">
+          <option value="usd">USD</option>
+          <option value="eur">EUR</option>
+          <option value="gbp">GBP</option>
+          <option value="myr">MYR</option>
+          <option value="sgd">SGD</option>
+          <option value="aud">AUD</option>
+          <option value="jpy">JPY</option>
+        </select>
+      </div>
+    </div>
+
+    <button type="submit" class="primary-btn" id="submitBtn">Save Route</button>
+    <div id="status"></div>
+  </form>
+
+  <p style="text-align:center; margin-top:24px;">
+    <button class="text-btn" id="forgetBtn">Forget saved password</button>
+  </p>
+</div>
+
+<script>
+  // ---- EDIT THIS after deploying your Cloudflare Worker (same Worker the
+  // Telegram Mini App uses) ----
+  const WORKER_URL = "https://flight-tracker-bridge.ckm1268.workers.dev/submit";
+  // ------------------------------------------------------------
+  const WORKER_ROUTES_URL = WORKER_URL.replace(/\/submit\/?$/, "") + "/routes";
+  const WORKER_REMOVE_URL = WORKER_URL.replace(/\/submit\/?$/, "") + "/remove";
+  const STORAGE_KEY = "flightTrackerAdminKey";
+
+  const lockScreen = document.getElementById("lockScreen");
+  const appEl = document.getElementById("app");
+  const adminKeyInput = document.getElementById("adminKeyInput");
+  const unlockBtn = document.getElementById("unlockBtn");
+  const lockStatus = document.getElementById("lockStatus");
+  const forgetBtn = document.getElementById("forgetBtn");
+
+  const form = document.getElementById("routeForm");
+  const submitBtn = document.getElementById("submitBtn");
+  const statusEl = document.getElementById("status");
+  const currentRoutesEl = document.getElementById("currentRoutes");
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+  }
+
+  function getStoredKey() {
+    try {
+      return localStorage.getItem(STORAGE_KEY) || "";
+    } catch (_) {
+      return ""; // private browsing / storage blocked - fall back to asking every time
+    }
+  }
+
+  function storeKey(key) {
+    try {
+      localStorage.setItem(STORAGE_KEY, key);
+    } catch (_) {
+      // non-fatal - the page still works for this visit, just won't remember next time
+    }
+  }
+
+  function clearStoredKey() {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (_) {}
+  }
+
+  function showApp() {
+    lockScreen.style.display = "none";
+    appEl.style.display = "block";
+    loadCurrentRoutes();
+  }
+
+  function showLock(message) {
+    appEl.style.display = "none";
+    lockScreen.style.display = "block";
+    lockStatus.textContent = message || "";
+    adminKeyInput.value = "";
+    adminKeyInput.focus();
+  }
+
+  async function tryUnlock(key) {
+    if (!key) {
+      lockStatus.textContent = "Enter your password.";
+      return;
+    }
+    unlockBtn.disabled = true;
+    lockStatus.textContent = "Checking…";
+    try {
+      const resp = await fetch(`${WORKER_ROUTES_URL}?key=${encodeURIComponent(key)}`);
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error(data.error || "Incorrect password");
+      storeKey(key);
+      showApp();
+    } catch (err) {
+      lockStatus.textContent = "❌ " + err.message;
+    } finally {
+      unlockBtn.disabled = false;
+    }
+  }
+
+  unlockBtn.addEventListener("click", () => tryUnlock(adminKeyInput.value.trim()));
+  adminKeyInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") tryUnlock(adminKeyInput.value.trim());
+  });
+  forgetBtn.addEventListener("click", () => {
+    clearStoredKey();
+    showLock("Password forgotten. Enter it again to continue.");
+  });
+
+  async function loadCurrentRoutes() {
+    const key = getStoredKey();
+    try {
+      const resp = await fetch(`${WORKER_ROUTES_URL}?key=${encodeURIComponent(key)}`);
+      const data = await resp.json();
+      if (resp.status === 401) {
+        clearStoredKey();
+        showLock("Session expired or password changed - enter it again.");
+        return;
+      }
+      if (!resp.ok || !data.ok) throw new Error(data.error || "Failed to load routes");
+
+      if (!data.routes || data.routes.length === 0) {
+        currentRoutesEl.innerHTML = '<p class="hint">No routes currently tracked yet.</p>';
+        return;
+      }
+
+      currentRoutesEl.innerHTML =
+        '<p class="hint" style="margin-bottom:8px;">Currently tracking:</p>' +
+        data.routes.map((r) => `
+          <div class="route-card">
+            <div>
+              <div class="route-name">${escapeHtml(r.name || `${r.origin}-${r.destination}`)}</div>
+              <div class="route-detail">${escapeHtml(r.origin)} &rarr; ${escapeHtml(r.destination)}
+                | depart ${escapeHtml(r.departure_date || "?")}${r.return_date ? ` / return ${escapeHtml(r.return_date)}` : " (one-way)"}
+                | target ${escapeHtml(r.target_price)} ${escapeHtml((r.currency || "").toUpperCase())}
+              </div>
+            </div>
+            <button class="route-remove-btn" data-origin="${escapeHtml(r.origin)}" data-destination="${escapeHtml(r.destination)}">Remove</button>
+          </div>
+        `).join("");
+
+      currentRoutesEl.querySelectorAll(".route-remove-btn").forEach((btn) => {
+        btn.addEventListener("click", () => removeRoute(btn.dataset.origin, btn.dataset.destination, btn));
+      });
+    } catch (err) {
+      currentRoutesEl.innerHTML = `<p class="hint">Could not load current routes (${escapeHtml(err.message)}).</p>`;
+    }
+  }
+
+  async function removeRoute(origin, destination, btnEl) {
+    if (!confirm(`Stop tracking ${origin} → ${destination}?`)) return;
+    btnEl.disabled = true;
+    btnEl.textContent = "Removing…";
+    try {
+      const resp = await fetch(WORKER_REMOVE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ admin_key: getStoredKey(), origin, destination }),
+      });
+      const data = await resp.json();
+      if (resp.status === 401) {
+        clearStoredKey();
+        showLock("Session expired or password changed - enter it again.");
+        return;
+      }
+      if (!resp.ok || !data.ok) throw new Error(data.error || `Request failed (${resp.status})`);
+      setStatus("success", `✅ Removing ${origin} → ${destination}… check Telegram/email shortly.`);
+      btnEl.closest(".route-card").style.opacity = "0.4";
+    } catch (err) {
+      setStatus("error", "Failed to remove: " + err.message);
+      btnEl.disabled = false;
+      btnEl.textContent = "Remove";
+    }
+  }
+
+  function setStatus(kind, text) {
+    statusEl.className = kind;
+    statusEl.textContent = text;
+  }
+
+  function currentValues() {
+    return {
+      route_name: document.getElementById("route_name").value.trim(),
+      origin: document.getElementById("origin").value.trim().toUpperCase(),
+      destination: document.getElementById("destination").value.trim().toUpperCase(),
+      departure_date: document.getElementById("departure_date").value,
+      return_date: document.getElementById("return_date").value,
+      target_price: document.getElementById("target_price").value,
+      currency: document.getElementById("currency").value,
+    };
+  }
+
+  function validate(values) {
+    if (!values.route_name) return "Please enter a route name.";
+    if (values.origin.length !== 3) return "Departure IATA code must be 3 letters.";
+    if (values.destination.length !== 3) return "Destination IATA code must be 3 letters.";
+    if (!values.departure_date) return "Please choose a departure date.";
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const departure = new Date(values.departure_date + "T00:00:00");
+    if (departure < today) return "Departure date can't be in the past.";
+
+    if (values.return_date) {
+      const returnD = new Date(values.return_date + "T00:00:00");
+      if (returnD <= departure) return "Return date must be after the departure date.";
+    }
+
+    if (!values.target_price || Number(values.target_price) <= 0) return "Please enter a valid target price.";
+    return null;
+  }
+
+  let isSubmitting = false;
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+
+    const values = currentValues();
+    const error = validate(values);
+    if (error) {
+      setStatus("error", error);
+      return;
+    }
+
+    isSubmitting = true;
+    submitBtn.disabled = true;
+    setStatus("loading", "Submitting…");
+
+    try {
+      const resp = await fetch(WORKER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          admin_key: getStoredKey(),
+          ...values,
+        }),
+      });
+      const data = await resp.json();
+
+      if (resp.status === 401) {
+        clearStoredKey();
+        showLock("Session expired or password changed - enter it again.");
+        return;
+      }
+      if (!resp.ok || !data.ok) {
+        throw new Error(data.error || `Request failed (${resp.status})`);
+      }
+
+      setStatus("success", "✅ Route saved! Check Telegram/email for confirmation shortly.");
+      form.reset();
+    } catch (err) {
+      setStatus("error", "Failed: " + err.message);
+    } finally {
+      isSubmitting = false;
+      submitBtn.disabled = false;
+    }
+  });
+
+  // ---- startup ----
+  const savedKey = getStoredKey();
+  if (savedKey) {
+    tryUnlock(savedKey);
+  } else {
+    showLock("");
+  }
+</script>
+
+</body>
+</html>

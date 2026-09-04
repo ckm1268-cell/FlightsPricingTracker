@@ -1,11 +1,16 @@
 /**
- * Cloudflare Worker - bridges the Telegram Mini App to your GitHub repo.
+ * Cloudflare Worker - bridges the Telegram Mini App AND the standalone web
+ * page (docs/web.html) to your GitHub repo. Same backend, two front ends.
  *
  * Flow:
  *   1. Mini App (docs/index.html) POSTs form data + Telegram initData here.
- *   2. This Worker verifies initData really came from Telegram (HMAC-SHA256
- *      signature check using your bot token) - this stops anyone else from
- *      forging a request even if they find this Worker's URL.
+ *      OR: the standalone page (docs/web.html) POSTs form data + a shared
+ *      admin_key here instead - see authorize() below.
+ *   2. This Worker verifies the caller is really authorized: Telegram
+ *      requests get an HMAC-SHA256 signature check on initData (using your
+ *      bot token); web-page requests get compared against WEB_ADMIN_KEY.
+ *      Either way, this stops anyone else from forging a request even if
+ *      they find this Worker's URL.
  *   3. If valid, creates a GitHub Issue in your repo using the same
  *      "### Label\n\nValue" format your existing add_route.yml workflow
  *      already knows how to parse, with the "add-route" label attached.
@@ -24,6 +29,14 @@
  *   GITHUB_REPO    (var)    - your repo name, e.g. "FlightsPricingTracker"
  *   ALLOWED_ORIGIN (var)    - your GitHub Pages URL, e.g.
  *                             "https://ckm1268-cell.github.io"
+ *
+ * Optional (only needed if you use the standalone web page, docs/web.html,
+ * instead of - or in addition to - the Telegram Mini App):
+ *   WEB_ADMIN_KEY  (secret) - a password you choose. The web page asks for
+ *                             it once and sends it with every request as an
+ *                             alternative to Telegram's initData check.
+ *                             Leave unset to disable the web page entirely
+ *                             (Telegram-only requests still work as before).
  */
 
 const FIELD_LABELS = {
@@ -94,6 +107,44 @@ async function validateInitData(initData, botToken, maxAgeSeconds = 86400) {
   } catch (_) {}
 
   return { valid: true, user };
+}
+
+/**
+ * Constant-time-ish string comparison, so checking the web admin key
+ * doesn't leak how many leading characters were correct via response
+ * timing. (Not a full cryptographic guarantee on every JS engine, but a
+ * solid improvement over `===` for a password check at this scale.)
+ */
+function timingSafeEqualStr(a, b) {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const maxLen = Math.max(a.length, b.length);
+  let diff = a.length === b.length ? 0 : 1;
+  for (let i = 0; i < maxLen; i++) {
+    const ca = i < a.length ? a.charCodeAt(i) : 0;
+    const cb = i < b.length ? b.charCodeAt(i) : 0;
+    diff |= ca ^ cb;
+  }
+  return diff === 0;
+}
+
+/**
+ * Authorizes a request from EITHER the Telegram Mini App (initData) OR the
+ * standalone web page (a shared admin key, checked against the
+ * WEB_ADMIN_KEY secret). Exactly one of initData/adminKey is expected to be
+ * present per request - if initData is present, only the Telegram check is
+ * tried (a failed Telegram session should not quietly fall back to a weaker
+ * check). If WEB_ADMIN_KEY isn't configured, the web-key path is disabled.
+ */
+async function authorize({ initData, adminKey }, env) {
+  if (initData) {
+    const check = await validateInitData(initData, env.BOT_TOKEN);
+    if (check.valid) return { valid: true, via: "telegram", user: check.user };
+    return { valid: false, reason: check.reason };
+  }
+  if (adminKey && env.WEB_ADMIN_KEY && timingSafeEqualStr(adminKey, env.WEB_ADMIN_KEY)) {
+    return { valid: true, via: "web" };
+  }
+  return { valid: false, reason: "missing or incorrect credentials" };
 }
 
 function stripQuotes(v) {
@@ -209,7 +260,8 @@ export default {
 
     if (url.pathname === "/routes" && request.method === "GET") {
       const initData = url.searchParams.get("initData") || "";
-      const check = await validateInitData(initData, env.BOT_TOKEN);
+      const adminKey = url.searchParams.get("key") || "";
+      const check = await authorize({ initData, adminKey }, env);
       if (!check.valid) {
         return new Response(JSON.stringify({ ok: false, error: "Unauthorized: " + check.reason }), {
           status: 401,
@@ -241,14 +293,14 @@ export default {
         });
       }
 
-      const { initData, origin, destination } = payload;
-      if (!initData) {
-        return new Response(JSON.stringify({ ok: false, error: "Missing initData" }), {
+      const { initData, admin_key: adminKey, origin, destination } = payload;
+      if (!initData && !adminKey) {
+        return new Response(JSON.stringify({ ok: false, error: "Missing credentials" }), {
           status: 400,
           headers: { ...headers, "Content-Type": "application/json" },
         });
       }
-      const check = await validateInitData(initData, env.BOT_TOKEN);
+      const check = await authorize({ initData, adminKey }, env);
       if (!check.valid) {
         return new Response(JSON.stringify({ ok: false, error: "Unauthorized: " + check.reason }), {
           status: 401,
@@ -293,16 +345,16 @@ export default {
       });
     }
 
-    const { initData, ...fields } = payload;
+    const { initData, admin_key: adminKey, ...fields } = payload;
 
-    if (!initData) {
-      return new Response(JSON.stringify({ ok: false, error: "Missing initData" }), {
+    if (!initData && !adminKey) {
+      return new Response(JSON.stringify({ ok: false, error: "Missing credentials" }), {
         status: 400,
         headers: { ...headers, "Content-Type": "application/json" },
       });
     }
 
-    const check = await validateInitData(initData, env.BOT_TOKEN);
+    const check = await authorize({ initData, adminKey }, env);
     if (!check.valid) {
       return new Response(JSON.stringify({ ok: false, error: "Unauthorized: " + check.reason }), {
         status: 401,
