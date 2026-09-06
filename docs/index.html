@@ -55,24 +55,24 @@
     gap: 12px;
   }
   .row2 > div { flex: 1; }
-  #status {
-    margin-top: 16px;
+  .status-banner {
+    margin-top: 12px;
     padding: 12px;
     border-radius: 10px;
     font-size: 14px;
     display: none;
   }
-  #status.error {
+  .status-banner.error {
     display: block;
     background: #ffe5e5;
     color: #b30000;
   }
-  #status.success {
+  .status-banner.success {
     display: block;
     background: #e3f7e3;
     color: #1a7a1a;
   }
-  #status.loading {
+  .status-banner.loading {
     display: block;
     background: var(--tg-theme-secondary-bg-color, #f0f0f0);
     color: var(--tg-theme-hint-color, #666666);
@@ -124,6 +124,7 @@
 <div id="currentRoutes" class="current-routes">
   <p class="hint">Loading current routes…</p>
 </div>
+<div id="removeStatus" class="status-banner"></div>
 
 <form id="routeForm">
   <label for="route_name">Route name</label>
@@ -189,6 +190,7 @@
   const form = document.getElementById("routeForm");
   const statusEl = document.getElementById("status");
   const currentRoutesEl = document.getElementById("currentRoutes");
+  const removeStatusEl = document.getElementById("removeStatus");
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({
@@ -230,10 +232,17 @@
     }
   }
 
+  function setBanner(el, kind, text) {
+    el.className = "status-banner " + kind;
+    el.textContent = text;
+    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
   async function removeRoute(origin, destination, btnEl) {
     if (!confirm(`Stop tracking ${origin} → ${destination}?`)) return;
     btnEl.disabled = true;
     btnEl.textContent = "Removing…";
+    setBanner(removeStatusEl, "loading", `Removing ${origin} → ${destination}…`);
     try {
       const resp = await fetch(WORKER_REMOVE_URL, {
         method: "POST",
@@ -243,11 +252,11 @@
       const data = await resp.json();
       if (!resp.ok || !data.ok) throw new Error(data.error || `Request failed (${resp.status})`);
       tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("success");
-      setStatus("success", `✅ Removing ${origin} → ${destination}… check Telegram shortly.`);
+      setBanner(removeStatusEl, "success", `✅ Removing ${origin} → ${destination}… check Telegram shortly.`);
       btnEl.closest(".route-card").style.opacity = "0.4";
     } catch (err) {
       tg.HapticFeedback && tg.HapticFeedback.notificationOccurred("error");
-      setStatus("error", "Failed to remove: " + err.message);
+      setBanner(removeStatusEl, "error", "❌ Failed to remove: " + err.message);
       btnEl.disabled = false;
       btnEl.textContent = "Remove";
     }
@@ -256,8 +265,7 @@
   loadCurrentRoutes();
 
   function setStatus(kind, text) {
-    statusEl.className = kind;
-    statusEl.textContent = text;
+    setBanner(statusEl, kind, text);
   }
 
   function currentValues() {

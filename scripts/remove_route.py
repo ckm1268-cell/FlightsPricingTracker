@@ -58,7 +58,13 @@ def main():
         config = yaml.safe_load(f) or {"routes": []}
     routes = config.get("routes") or []
 
-    remaining = [r for r in routes if not (r.get("origin") == origin and r.get("destination") == destination)]
+    def norm(v):
+        return str(v or "").strip().upper()
+
+    remaining = [
+        r for r in routes
+        if not (norm(r.get("origin")) == origin and norm(r.get("destination")) == destination)
+    ]
     removed = len(remaining) != len(routes)
 
     config["routes"] = remaining

@@ -111,9 +111,12 @@ def main():
 
     # Match existing route by origin+destination - update in place if found,
     # otherwise add as a new route so multiple routes can be tracked at once.
+    def norm(v):
+        return str(v or "").strip().upper()
+
     existing_index = None
     for i, r in enumerate(routes):
-        if r.get("origin") == origin and r.get("destination") == destination:
+        if norm(r.get("origin")) == origin and norm(r.get("destination")) == destination:
             existing_index = i
             break
 
