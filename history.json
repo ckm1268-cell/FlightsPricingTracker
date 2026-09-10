@@ -2191,7 +2191,7 @@
   "KUL-URC-2027-06-09": {
     "consecutive_failures": 0,
     "failure_alert_sent": false,
-    "last_checked": "2026-09-09T22:54:36.798593+00:00",
+    "last_checked": "2026-09-10T03:02:49.458583+00:00",
     "last_price": 1938,
     "under_target": true,
     "price_log": [
@@ -2269,6 +2269,10 @@
       },
       {
         "date": "2026-09-09T22:54:36.798593+00:00",
+        "price": 1938
+      },
+      {
+        "date": "2026-09-10T03:02:49.458583+00:00",
         "price": 1938
       }
     ]
