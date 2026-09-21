@@ -1,8 +1,8 @@
 routes:
-- name: Kuala Lumpur to Urumuqi
+- name: KL to Urumuqi
   origin: KUL
   destination: URC
   departure_date: '2027-06-09'
   return_date: '2027-06-19'
-  target_price: 2100.0
+  target_price: 2000.0
   currency: myr
