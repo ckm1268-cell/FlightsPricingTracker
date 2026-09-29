@@ -2189,7 +2189,7 @@
     ]
   },
   "KUL-URC-2027-06-09": {
-    "consecutive_failures": 1,
+    "consecutive_failures": 2,
     "failure_alert_sent": false,
     "last_checked": "2026-09-28T21:03:24.304543+00:00",
     "last_price": 1732,
