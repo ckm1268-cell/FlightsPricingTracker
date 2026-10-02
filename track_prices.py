@@ -65,6 +65,38 @@ CONSECUTIVE_FAILURE_THRESHOLD = 3  # send a self-monitoring alert after this man
 PRICE_LOG_WINDOW_DAYS = 30
 
 
+def redact(text):
+    """Strip the API token out of error text before it is saved to the
+    public history.json or printed to the public Actions log (requests
+    errors include the full URL, token query parameter and all)."""
+    text = str(text)
+    if TRAVELPAYOUTS_TOKEN:
+        text = text.replace(TRAVELPAYOUTS_TOKEN, "***")
+    return text[:300]
+
+
+def record_failure(entry, kind, message, now_iso):
+    """Bump the failure counter and keep the reason, so history.json shows
+    WHY a route is failing (API error vs. simply no fare data)."""
+    entry["consecutive_failures"] = entry.get("consecutive_failures", 0) + 1
+    entry["last_error_type"] = kind          # "api_error" or "no_data"
+    entry["last_error"] = redact(message)
+    entry["last_error_at"] = now_iso
+    if entry["consecutive_failures"] == 1:
+        entry["failing_since"] = now_iso
+
+
+def report_failing_routes(failing):
+    """Expose routes at/over the failure threshold to the workflow, which
+    turns the run red AFTER history.json has been committed."""
+    for msg in failing:
+        print(f"::error title=Route check failing::{msg}")
+    gh_output = os.environ.get("GITHUB_OUTPUT")
+    if gh_output:
+        with open(gh_output, "a", encoding="utf-8") as f:
+            f.write(f"failing_routes={len(failing)}\n")
+
+
 def load_config():
     with open(CONFIG_PATH) as f:
         data = yaml.safe_load(f) or {}
@@ -435,19 +467,19 @@ def main():
                 best["airline"] = airline_code
                 best["airline_approximate"] = airline_approx
         except Exception as e:
-            print(f"  Failed to fetch price for {key}: {e}")
-            entry["consecutive_failures"] = entry.get("consecutive_failures", 0) + 1
+            print(f"  Failed to fetch price for {key}: {redact(e)}")
+            record_failure(entry, "api_error", f"{type(e).__name__}: {e}", now)
             print(f"  Consecutive failures for this route: {entry['consecutive_failures']}")
             if (entry["consecutive_failures"] >= CONSECUTIVE_FAILURE_THRESHOLD
                     and not entry.get("failure_alert_sent")):
-                failure_alerts.append(f"{route['name']} ({key}): {entry['consecutive_failures']} checks in a row - last error: {e}")
+                failure_alerts.append(f"{route['name']} ({key}): {entry['consecutive_failures']} checks in a row - last error: {redact(e)}")
                 entry["failure_alert_sent"] = True
             history[key] = entry
             continue
 
         if best is None:
             print(f"  No fare data found for {key} (exact or approximate)")
-            entry["consecutive_failures"] = entry.get("consecutive_failures", 0) + 1
+            record_failure(entry, "no_data", "Travelpayouts returned no fares (exact-date or monthly) for this route", now)
             if (entry["consecutive_failures"] >= CONSECUTIVE_FAILURE_THRESHOLD
                     and not entry.get("failure_alert_sent")):
                 failure_alerts.append(f"{route['name']} ({key}): no fare data found for {entry['consecutive_failures']} checks in a row")
@@ -458,6 +490,8 @@ def main():
         # success - reset failure tracking
         entry["consecutive_failures"] = 0
         entry["failure_alert_sent"] = False
+        for k in ("last_error", "last_error_type", "last_error_at", "failing_since"):
+            entry.pop(k, None)
 
         price = best["value"]
         target = route["target_price"]
@@ -538,6 +572,19 @@ def main():
         ) + "\n\nCheck the GitHub Actions log for details - your TRAVELPAYOUTS_TOKEN or route data may need attention."
         send_telegram(warning)
         send_email("Flight tracker: repeated check failures", warning)
+
+    # Only routes still in config.yaml count - old/removed routes linger in history.
+    failing = []
+    for route in routes:
+        key = f"{route['origin']}-{route['destination']}-{route['departure_date']}"
+        e = history.get(key, {})
+        if e.get("consecutive_failures", 0) >= CONSECUTIVE_FAILURE_THRESHOLD:
+            failing.append(
+                f"{route['name']} ({key}): {e['consecutive_failures']} failed checks in a row "
+                f"since {e.get('failing_since', 'unknown')} - {e.get('last_error_type', 'unknown')}: "
+                f"{e.get('last_error', 'no details recorded')}"
+            )
+    report_failing_routes(failing)
 
 
 if __name__ == "__main__":
