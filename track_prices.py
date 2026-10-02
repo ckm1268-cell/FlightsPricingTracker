@@ -82,8 +82,9 @@ def record_failure(entry, kind, message, now_iso):
     entry["last_error_type"] = kind          # "api_error" or "no_data"
     entry["last_error"] = redact(message)
     entry["last_error_at"] = now_iso
-    if entry["consecutive_failures"] == 1:
-        entry["failing_since"] = now_iso
+    # setdefault also covers routes that were already failing before this
+    # field existed (it is cleared again on the next successful check)
+    entry.setdefault("failing_since", now_iso)
 
 
 def report_failing_routes(failing):
