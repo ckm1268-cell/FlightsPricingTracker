@@ -2189,32 +2189,12 @@
     ]
   },
   "KUL-URC-2027-06-09": {
-    "consecutive_failures": 1,
+    "consecutive_failures": 0,
     "failure_alert_sent": false,
-    "last_checked": "2026-10-12T00:31:27.328347+00:00",
-    "last_price": 2413,
+    "last_checked": "2026-10-12T21:15:52.652366+00:00",
+    "last_price": 2574,
     "under_target": false,
     "price_log": [
-      {
-        "date": "2026-09-12T03:04:59.709318+00:00",
-        "price": 1979
-      },
-      {
-        "date": "2026-09-12T10:04:33.948869+00:00",
-        "price": 1976
-      },
-      {
-        "date": "2026-09-12T14:58:10.597986+00:00",
-        "price": 1976
-      },
-      {
-        "date": "2026-09-12T17:43:17.351462+00:00",
-        "price": 1976
-      },
-      {
-        "date": "2026-09-12T20:10:39.675218+00:00",
-        "price": 1976
-      },
       {
         "date": "2026-09-12T22:49:52.702082+00:00",
         "price": 1976
@@ -2602,17 +2582,17 @@
       {
         "date": "2026-10-12T00:31:27.328347+00:00",
         "price": 2413
+      },
+      {
+        "date": "2026-10-12T21:15:52.652366+00:00",
+        "price": 2574
       }
-    ],
-    "last_error_type": "no_data",
-    "last_error": "Travelpayouts returned no fares (exact-date or monthly) for this route",
-    "last_error_at": "2026-10-12T10:45:25.347136+00:00",
-    "failing_since": "2026-10-12T10:45:25.347136+00:00"
+    ]
   },
   "KUL-CAN-2027-01-13": {
     "consecutive_failures": 0,
     "failure_alert_sent": false,
-    "last_checked": "2026-10-12T10:45:25.347136+00:00",
+    "last_checked": "2026-10-12T21:15:52.652366+00:00",
     "last_price": 729,
     "under_target": true,
     "price_log": [
@@ -2754,6 +2734,10 @@
       },
       {
         "date": "2026-10-12T10:45:25.347136+00:00",
+        "price": 729
+      },
+      {
+        "date": "2026-10-12T21:15:52.652366+00:00",
         "price": 729
       }
     ]
