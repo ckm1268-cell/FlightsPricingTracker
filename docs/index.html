@@ -352,6 +352,23 @@
   tg.MainButton.onClick(submitRoute);
 
   form.addEventListener("submit", (e) => e.preventDefault());
+
+  // When a departure date is picked, pre-fill the return date as departure + 1 day
+  // (the earliest allowed). The return date can still be changed or cleared for one-way.
+  (function autoFillReturnDate() {
+    const departEl = document.getElementById("departure_date");
+    const returnEl = document.getElementById("return_date");
+    if (!departEl || !returnEl) return;
+    departEl.addEventListener("change", () => {
+      if (!departEl.value) { returnEl.min = ""; return; }
+      const [y, m, d] = departEl.value.split("-").map(Number);
+      const next = new Date(y, m - 1, d + 1);   // local date maths, no timezone shift
+      const pad = (n) => String(n).padStart(2, "0");
+      const nextStr = `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}`;
+      returnEl.min = nextStr;
+      returnEl.value = nextStr;
+    });
+  })();
 </script>
 
 </body>
