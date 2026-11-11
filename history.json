@@ -2191,7 +2191,7 @@
   "KUL-URC-2027-06-09": {
     "consecutive_failures": 0,
     "failure_alert_sent": false,
-    "last_checked": "2026-11-11T06:11:15.507497+00:00",
+    "last_checked": "2026-11-11T14:18:05.269227+00:00",
     "last_price": 2058,
     "under_target": false,
     "price_log": [
@@ -2634,20 +2634,20 @@
       {
         "date": "2026-11-11T06:11:15.507497+00:00",
         "price": 2058
+      },
+      {
+        "date": "2026-11-11T14:18:05.269227+00:00",
+        "price": 2058
       }
     ]
   },
   "KUL-CAN-2027-01-13": {
     "consecutive_failures": 0,
     "failure_alert_sent": false,
-    "last_checked": "2026-11-11T06:11:15.507497+00:00",
+    "last_checked": "2026-11-11T14:18:05.269227+00:00",
     "last_price": 882,
     "under_target": true,
     "price_log": [
-      {
-        "date": "2026-10-12T10:45:25.347136+00:00",
-        "price": 729
-      },
       {
         "date": "2026-10-12T21:15:52.652366+00:00",
         "price": 729
@@ -3086,6 +3086,10 @@
       },
       {
         "date": "2026-11-11T06:11:15.507497+00:00",
+        "price": 882
+      },
+      {
+        "date": "2026-11-11T14:18:05.269227+00:00",
         "price": 882
       }
     ]
