@@ -1,10 +1,10 @@
 routes:
-- name: KL to Urumuqi
+- name: KL to Urumqi
   origin: KUL
   destination: URC
-  departure_date: '2027-06-09'
-  return_date: '2027-06-19'
-  target_price: 2000.0
+  departure_date: '2027-06-16'
+  return_date: '2027-06-26'
+  target_price: 2200.0
   currency: myr
 - name: KL to Guangzhou
   origin: KUL
